@@ -1,4 +1,4 @@
+use before_build::{bb, BitBoard};
+
 mod index;
-mod bitboard;
-mod square;
 mod repr;

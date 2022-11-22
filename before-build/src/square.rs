@@ -3,7 +3,7 @@ use std::ops::{Index, IndexMut};
 use crate::bitboard::BitBoard;
 
 #[derive(Clone, Copy)]
-pub struct Square(pub(crate) u32);
+pub struct Square(pub u32);
 
 impl Square {
     pub const A1: Square = Square(0b000000);
@@ -152,6 +152,19 @@ impl<T> Index<Square> for [T; 64] {
 }
 
 impl<T> IndexMut<Square> for [T; 64] {
+    fn index_mut(&mut self, index: Square) -> &mut Self::Output {
+        &mut self[index.0 as usize]
+    }
+}
+impl<T> Index<Square> for Vec<T> {
+    type Output = T;
+
+    fn index(&self, index: Square) -> &Self::Output {
+        &self[index.0 as usize]
+    }
+}
+
+impl<T> IndexMut<Square> for Vec<T> {
     fn index_mut(&mut self, index: Square) -> &mut Self::Output {
         &mut self[index.0 as usize]
     }

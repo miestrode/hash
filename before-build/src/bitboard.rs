@@ -1,6 +1,7 @@
 use std::{
+    fmt::{self, Display, Formatter, Write},
     iter,
-    ops::{Add, AddAssign, Not, Shl, Shr, Sub},
+    ops::{Add, AddAssign, BitAnd, Not, Shl, Shr, Sub},
 };
 
 use crate::square::Square;
@@ -137,6 +138,27 @@ impl BitBoard {
     pub fn move_one_down_right(self, o: Orientation) -> Self {
         self.move_one_down(o).move_one_right()
     }
+
+    pub fn count_ones(&self) -> u32 {
+        self.0.count_ones()
+    }
+
+    pub fn get_bit(&self, square: Square) -> bool {
+        *self & square.as_bitboard() != BitBoard::EMPTY
+    }
+
+    // Taken from https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#Horizontal
+    pub fn h_flip(self) -> Self {
+        let k_1 = 0x5555555555555555;
+        let k_2 = 0x3333333333333333;
+        let k_4 = 0x0f0f0f0f0f0f0f0f;
+        
+        let mut x = self.0;
+        x = ((x >> 1) & k_1) + 2 * (x & k_1);
+        x = ((x >> 2) & k_2) + 4 * (x & k_2);
+        
+        BitBoard(((x >> 4) & k_4) + 16 * (x & k_4))
+    }
 }
 
 impl Sub for BitBoard {
@@ -152,6 +174,14 @@ impl const Add for BitBoard {
 
     fn add(self, rhs: Self) -> Self::Output {
         BitBoard(self.0 | rhs.0)
+    }
+}
+
+impl BitAnd for BitBoard {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        BitBoard(self.0 & rhs.0)
     }
 }
 
@@ -180,4 +210,37 @@ impl Shr<u32> for BitBoard {
     fn shr(self, rhs: u32) -> Self::Output {
         BitBoard(self.0 << rhs)
     }
+}
+
+impl Display for BitBoard {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for row in 1..=8 {
+            for column in 0..8 {
+                if self.get_bit(Square((64 - row * 8) + column)) {
+                    f.write_char('1')?;
+                } else {
+                    f.write_char('.')?;
+                }
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[macro_export]
+macro_rules! bb {
+    ($line0:tt $line1:tt $line2:tt $line3:tt $line4:tt $line5:tt $line6:tt $line7:tt) => {
+        BitBoard(
+            ($line0 << 56)
+                | ($line1 << 48)
+                | ($line2 << 40)
+                | ($line3 << 32)
+                | ($line4 << 24)
+                | ($line5 << 16)
+                | ($line6 << 8)
+                | $line7,
+        ).h_flip()
+    };
 }

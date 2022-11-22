@@ -1,4 +1,4 @@
-use crate::{square::Square, bitboard::BitBoard};
+use before_build::{BitBoard, Square};
 
 pub enum PieceKind {
     King,
@@ -6,24 +6,31 @@ pub enum PieceKind {
     Rook,
     Bishop,
     Knight,
-    Pawn
+    Pawn,
 }
 
 pub(crate) enum Color {
     White,
-    Black
+    Black,
 }
 
 pub(crate) struct Piece {
     kind: PieceKind,
-    color: Color
+    color: Color,
 }
 
 pub enum Move {
-    Simple { origin: Square, target: Square, is_double_push: bool },
-    EnPassant { origin: Square, target: Square },
+    Simple {
+        origin: Square,
+        target: Square,
+        is_double_push: bool,
+    },
+    EnPassant {
+        origin: Square,
+        target: Square,
+    },
     Promotion {
-        to: PieceKind
+        to: PieceKind,
     },
     Ks,
     Qs,
@@ -37,7 +44,7 @@ pub(crate) struct Player {
     knights: BitBoard,
     pawns: BitBoard,
     can_ks: bool,
-    can_qs: bool
+    can_qs: bool,
 }
 
 pub struct Board {
@@ -45,5 +52,5 @@ pub struct Board {
     opposing_player: Player,
     playing_side: Color,
     ep_square: Option<Square>,
-    duck: Option<Square>
+    duck: Option<Square>,
 }
