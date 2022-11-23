@@ -1,4 +1,4 @@
-use before_build::{BitBoard, Square, Metadata};
+use before_build::{BitBoard, Metadata, Square};
 
 include!(concat!(env!("OUT_DIR"), "/table.rs"));
 
@@ -26,9 +26,12 @@ pub fn gen_rook_moves(piece: Square, blockers: BitBoard) -> BitBoard {
 pub fn gen_bishop_moves(piece: Square, blockers: BitBoard) -> BitBoard {
     use std::arch::x86_64::{_pdep_u64, _pext_u64};
 
+    let metadata = DIAGONAL_METADATA[square];
+
     BitBoard(unsafe {
         _pdep_u64(
-            DIAGONAL_SLIDES[DIAGONAL_OFFSETS[piece] + _pext_u64(blockers.0, DIAGONAL_MASKS[piece].0) as usize] as u64,
+            DIAGONAL_SLIDES[metadata.offset + _pext_u64(blockers.0, metadata.mask.0) as usize]
+                as u64,
             DIAGONAL_RAYS[piece].0,
         )
     })
@@ -37,11 +40,13 @@ pub fn gen_bishop_moves(piece: Square, blockers: BitBoard) -> BitBoard {
 #[cfg(not(target_feature = "bmi2"))]
 pub fn gen_rook_moves(piece: Square, blockers: BitBoard) -> BitBoard {
     let metadata = CROSS_METADATA[piece];
-    SLIDES[metadata.offset + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 12)) as usize]
+    SLIDES[metadata.offset
+        + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 12)) as usize]
 }
 
 #[cfg(not(target_feature = "bmi2"))]
 pub fn gen_bishop_moves(piece: Square, blockers: BitBoard) -> BitBoard {
     let metadata = DIAGONAL_METADATA[piece];
-    SLIDES[metadata.offset + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 9)) as usize]
+    SLIDES[metadata.offset
+        + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 9)) as usize]
 }
