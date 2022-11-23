@@ -3,7 +3,7 @@ use std::{env, fmt::Debug, fs, io::Error, path::PathBuf};
 
 use before_build::{
     gen_cross_slides, gen_diagonal_slides, gen_king_index, gen_knight_index, BitBoard, Metadata,
-    Square,
+    Square, gen_diagonal_mask, gen_cross_mask,
 };
 
 fn gen_piece_table(move_fn: impl Fn(BitBoard) -> BitBoard) -> Vec<BitBoard> {
@@ -31,12 +31,15 @@ fn main() -> Result<(), Error> {
     #[cfg(target_feature = "bmi2")]
     // If you can: use PEXT bitboards
     {
+        use std::arch::x86_64::_pext_u64;
+
         // The first returned value is the raw data of the slide table. In order to properly index into it
         // however, the second returned value is needed. It contains a list of offsets for every single
         // square whose data is in the table. These tell us when each square starts or ends in the table,
         // which is necessary, since squares are not equally spaced out.
         fn gen_slide_table(
             mask_fn: impl Fn(BitBoard) -> BitBoard,
+            #[allow(clippy::ptr_arg)]
             rays: &Vec<BitBoard>,
             move_fn: impl Fn(BitBoard, BitBoard) -> BitBoard,
         ) -> (Vec<u16>, [Metadata; 64]) {
@@ -76,7 +79,7 @@ fn main() -> Result<(), Error> {
             gen_slide_table(gen_diagonal_mask, &diagonal_rays, gen_diagonal_slides);
 
         fs::write(
-            &pext_file,
+            pext_file,
             stringify_table("CROSS_SLIDES", "u16", &cross_data)
                 + &stringify_table("CROSS_META", "Metadata", &cross_meta)
                 + &stringify_table("DIAGONAL_SLIDES", "u16", &diagonal_data)
@@ -250,7 +253,7 @@ fn main() -> Result<(), Error> {
 
         let magic_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("magic.rs");
         fs::write(
-            &magic_file,
+            magic_file,
             stringify_table("SLIDES", "BitBoard", &table)
                 + &stringify_table("CROSS_METADATA", "Metadata", &cross_metadata)
                 + &stringify_table("DIAGONAL_METADATA", "Metadata", &diagonal_metadata),
@@ -259,7 +262,7 @@ fn main() -> Result<(), Error> {
 
     let table_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("table.rs");
     fs::write(
-        &table_file,
+        table_file,
         stringify_table("CROSS_RAYS", "BitBoard", &cross_rays)
             + &stringify_table("DIAGONAL_RAYS", "BitBoard", &diagonal_rays)
             + &stringify_table(

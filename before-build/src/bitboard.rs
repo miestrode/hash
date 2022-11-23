@@ -95,7 +95,7 @@ impl BitBoard {
         let square = self.0.trailing_zeros();
 
         // PERF: Consider switching this to (self.0 & self.0 - 1), in case performance is better
-        self.0 = self.0 ^ (1 << square);
+        self.0 ^= 1 << square;
 
         Square(square)
     }
@@ -161,6 +161,7 @@ impl BitBoard {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Sub for BitBoard {
     type Output = Self;
 
@@ -169,6 +170,7 @@ impl Sub for BitBoard {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl const Add for BitBoard {
     type Output = Self;
 
@@ -185,6 +187,7 @@ impl BitAnd for BitBoard {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl AddAssign for BitBoard {
     fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
@@ -196,6 +199,7 @@ impl AddAssign for BitBoard {
 // rank-file representation, which basically means that the board bits are placed from left to
 // right. Therefore, a left shift on a bit board would really be a right shift on a collection of
 // bits.
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Shl<u32> for BitBoard {
     type Output = Self;
 
@@ -204,6 +208,7 @@ impl Shl<u32> for BitBoard {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Shr<u32> for BitBoard {
     type Output = Self;
 

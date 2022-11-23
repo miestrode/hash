@@ -12,7 +12,7 @@ include!(concat!(env!("OUT_DIR"), "/magic.rs"));
 pub fn gen_rook_moves(piece: Square, blockers: BitBoard) -> BitBoard {
     use std::arch::x86_64::{_pdep_u64, _pext_u64};
 
-    let metadata = CROSS_METADATA[square];
+    let metadata = CROSS_META[piece];
 
     BitBoard(unsafe {
         _pdep_u64(
@@ -26,7 +26,7 @@ pub fn gen_rook_moves(piece: Square, blockers: BitBoard) -> BitBoard {
 pub fn gen_bishop_moves(piece: Square, blockers: BitBoard) -> BitBoard {
     use std::arch::x86_64::{_pdep_u64, _pext_u64};
 
-    let metadata = DIAGONAL_METADATA[square];
+    let metadata = DIAGONAL_META[piece];
 
     BitBoard(unsafe {
         _pdep_u64(
