@@ -41,7 +41,7 @@ impl Pawn {
         let king = board.current_player.king.first_one_as_square();
 
         // Test for any rays hitting the king
-        (index::bishop_slides(king, occupation) + index::rook_slides(king, occupation)
+        ((index::bishop_slides(king, occupation) + index::rook_slides(king, occupation))
             & (board.opposing_player.queens
                 + board.opposing_player.rooks
                 + board.opposing_player.bishops))
@@ -157,7 +157,7 @@ impl Gen for Pawn {
 
                     if capturer.isnt_empty()
                         && Pawn::is_legal_ep_capture(
-                            &board,
+                            board,
                             occupation,
                             ep_data,
                             capturer.first_one_as_square(),
@@ -177,7 +177,7 @@ impl Gen for Pawn {
 
                     if capturer.isnt_empty()
                         && Pawn::is_legal_ep_capture(
-                            &board,
+                            board,
                             occupation,
                             ep_data,
                             capturer.first_one_as_square(),
@@ -507,14 +507,14 @@ fn gen_moves(board: &Board) -> Moves {
     };
 
     if !board.current_player.king_must_move {
-        Pawn::legal_moves(&board, occupation, orientation, &mut moves);
-        Knight::legal_moves(&board, occupation, orientation, &mut moves);
-        Bishop::legal_moves(&board, occupation, orientation, &mut moves);
-        Rook::legal_moves(&board, occupation, orientation, &mut moves);
-        Queen::legal_moves(&board, occupation, orientation, &mut moves);
+        Pawn::legal_moves(board, occupation, orientation, &mut moves);
+        Knight::legal_moves(board, occupation, orientation, &mut moves);
+        Bishop::legal_moves(board, occupation, orientation, &mut moves);
+        Rook::legal_moves(board, occupation, orientation, &mut moves);
+        Queen::legal_moves(board, occupation, orientation, &mut moves);
     }
 
-    King::legal_moves(&board, occupation, orientation, &mut moves);
+    King::legal_moves(board, occupation, orientation, &mut moves);
 
     moves
 }
