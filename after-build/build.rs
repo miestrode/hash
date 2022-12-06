@@ -1,10 +1,111 @@
 #![feature(const_trait_impl)]
 use std::{env, fmt::Debug, fs, io::Error, path::PathBuf};
 
-use before_build::{
-    gen_cross_slides, gen_diagonal_slides, gen_king_index, gen_knight_index, BitBoard, Metadata,
-    Square, gen_diagonal_mask, gen_cross_mask,
-};
+use before_build::{BitBoard, Metadata, Orientation, Square};
+
+// All of the edges of the board. Useful for slide generation, since they represent areas that will
+// be reached no matter if they are blocked by pieces, since blockers can be eaten
+const EDGES: BitBoard = BitBoard::EDGE_FILES + BitBoard::EDGE_RANKS;
+
+// PERF: This is very slow, especially when used to spew out multiple rays, however, it doesn't
+// matter since this isn't used to actually generate rays during runtime
+pub fn gen_ray(
+    pieces: BitBoard,
+    blockers: BitBoard,
+    update_fn: impl Fn(BitBoard) -> BitBoard,
+) -> BitBoard {
+    let mut rays = pieces;
+
+    (loop {
+        // Basically, you can at most go to positions occupied by blockers, not past them. Because
+        // of this, ray positions with blockers in them are removed, so they won't be advanced
+        let moveable_rays = rays - blockers;
+
+        let next_rays = rays + update_fn(moveable_rays);
+
+        if rays == next_rays {
+            break rays;
+        }
+
+        rays = next_rays;
+    }) - pieces
+}
+
+// This function returns the horizontal and vertical slide separately, as they are needed for
+// correct "gen_cross_index" edges.
+// NOTE: Blockers can be eaten
+pub fn gen_cross_slides_separated(pieces: BitBoard, blockers: BitBoard) -> (BitBoard, BitBoard) {
+    (
+        gen_ray(pieces, blockers, |state| {
+            BitBoard::move_one_up(state, Orientation::BottomToTop)
+        }) + gen_ray(pieces, blockers, |state| {
+            BitBoard::move_one_down(state, Orientation::BottomToTop)
+        }),
+        gen_ray(pieces, blockers, |state| {
+            BitBoard::move_one_left(state, Orientation::BottomToTop)
+        }) + gen_ray(pieces, blockers, |state| {
+            BitBoard::move_one_right(state, Orientation::BottomToTop)
+        }),
+    )
+}
+
+// This function returns the horizontal and vertical slide separately, as they are needed for
+// correct "gen_cross_index" edges.
+// NOTE: Blockers can be eaten
+pub fn gen_cross_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
+    let (v_slides, h_slides) = gen_cross_slides_separated(pieces, blockers);
+
+    h_slides + v_slides
+}
+
+// NOTE: Blockers can be eaten
+pub fn gen_diagonal_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
+    gen_ray(pieces, blockers, |s| {
+        BitBoard::move_one_up_right(s, Orientation::BottomToTop)
+    }) + gen_ray(pieces, blockers, |s| {
+        BitBoard::move_one_up_left(s, Orientation::BottomToTop)
+    }) + gen_ray(pieces, blockers, |s| {
+        BitBoard::move_one_down_left(s, Orientation::BottomToTop)
+    }) + gen_ray(pieces, blockers, |s| {
+        BitBoard::move_one_down_right(s, Orientation::BottomToTop)
+    })
+}
+
+pub fn gen_knight_index(piece: BitBoard) -> BitBoard {
+    let top = piece.move_one_up(Orientation::BottomToTop);
+    let bottom = piece.move_one_down(Orientation::BottomToTop);
+    let left = piece.move_one_left(Orientation::BottomToTop);
+    let right = piece.move_one_right(Orientation::BottomToTop);
+
+    top.move_one_up_right(Orientation::BottomToTop)
+        + top.move_one_up_left(Orientation::BottomToTop)
+        + left.move_one_up_left(Orientation::BottomToTop)
+        + left.move_one_down_left(Orientation::BottomToTop)
+        + bottom.move_one_down_left(Orientation::BottomToTop)
+        + bottom.move_one_down_right(Orientation::BottomToTop)
+        + right.move_one_up_right(Orientation::BottomToTop)
+        + right.move_one_down_right(Orientation::BottomToTop)
+}
+
+pub fn gen_king_index(piece: BitBoard) -> BitBoard {
+    let line = piece.move_one_left(Orientation::BottomToTop)
+        + piece
+        + piece.move_one_right(Orientation::BottomToTop);
+    line.move_one_up(Orientation::BottomToTop) + line + line.move_one_down(Orientation::BottomToTop)
+        - piece
+}
+
+pub fn gen_cross_mask(piece: BitBoard) -> BitBoard {
+    let (v_slides, h_slides) = gen_cross_slides_separated(piece, BitBoard::EMPTY);
+    let correct_edges = (BitBoard::EDGE_FILES - v_slides) + (BitBoard::EDGE_RANKS - h_slides);
+
+    // All slide collections blocked by pieces will be subsets of this template
+    v_slides + h_slides - correct_edges
+}
+
+pub fn gen_diagonal_mask(piece: BitBoard) -> BitBoard {
+    gen_diagonal_slides(piece, BitBoard::EMPTY) - EDGES
+}
 
 fn gen_piece_table(move_fn: impl Fn(BitBoard) -> BitBoard) -> Vec<BitBoard> {
     Square::ALL
@@ -39,8 +140,7 @@ fn main() -> Result<(), Error> {
         // which is necessary, since squares are not equally spaced out.
         fn gen_slide_table(
             mask_fn: impl Fn(BitBoard) -> BitBoard,
-            #[allow(clippy::ptr_arg)]
-            rays: &Vec<BitBoard>,
+            #[allow(clippy::ptr_arg)] rays: &Vec<BitBoard>,
             move_fn: impl Fn(BitBoard, BitBoard) -> BitBoard,
         ) -> (Vec<u16>, [Metadata; 64]) {
             let mut metadata = [Metadata {
@@ -255,8 +355,8 @@ fn main() -> Result<(), Error> {
         fs::write(
             magic_file,
             stringify_table("SLIDES", "BitBoard", &table)
-                + &stringify_table("CROSS_METADATA", "Metadata", &cross_metadata)
-                + &stringify_table("DIAGONAL_METADATA", "Metadata", &diagonal_metadata),
+                + &stringify_table("CROSS_META", "Metadata", &cross_metadata)
+                + &stringify_table("DIAGONAL_META", "Metadata", &diagonal_metadata),
         )?;
     }
 
@@ -266,11 +366,11 @@ fn main() -> Result<(), Error> {
         stringify_table("CROSS_RAYS", "BitBoard", &cross_rays)
             + &stringify_table("DIAGONAL_RAYS", "BitBoard", &diagonal_rays)
             + &stringify_table(
-                "KNIGHT_MOVES",
+                "KNIGHT_ATTACKS",
                 "BitBoard",
                 &gen_piece_table(gen_knight_index),
             )
-            + &stringify_table("KING_MOVES", "BitBoard", &gen_piece_table(gen_king_index)),
+            + &stringify_table("KING_ATTACKS", "BitBoard", &gen_piece_table(gen_king_index)),
     )?;
 
     println!("cargo:rerun-if-changed=build.rs");

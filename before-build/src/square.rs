@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use crate::bitboard::BitBoard;
+use crate::{bitboard::BitBoard, Orientation};
 
 #[derive(Clone, Copy)]
 pub struct Square(pub u32);
@@ -141,6 +141,45 @@ impl Square {
     pub fn as_bitboard(&self) -> BitBoard {
         BitBoard(1 << self.0)
     }
+
+    pub unsafe fn move_one_down_unchecked(&self, orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => Self(self.0 - 8),
+            Orientation::TopToBottom => Self(self.0 + 8),
+        }
+    }
+
+    pub unsafe fn move_two_down_unchecked(&self, orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => Self(self.0 - 16),
+            Orientation::TopToBottom => Self(self.0 + 16),
+        }
+    }
+
+    pub unsafe fn move_one_down_left_unchecked(&self, orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => Self(self.0 - 9),
+            Orientation::TopToBottom => Self(self.0 + 9),
+        }
+    }
+
+    pub unsafe fn move_one_down_right_unchecked(&self, orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => Self(self.0 - 7),
+            Orientation::TopToBottom => Self(self.0 + 7),
+        }
+    }
+
+    pub unsafe fn move_one_up_unchecked(&self, orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => Self(self.0 + 8),
+            Orientation::TopToBottom => Self(self.0 - 8),
+        }
+    }
+
+    pub fn rank(&self) -> u32 {
+        self.0 / 8
+   }
 }
 
 impl<T> Index<Square> for [T; 64] {

@@ -9,4 +9,5 @@ edition = "2021"
 before-build = {path = "../before-build"}
 
 [dependencies]
+arrayvec = "0.7.2"
 before-build = {path = "../before-build"}

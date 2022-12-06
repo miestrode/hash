@@ -9,7 +9,7 @@ include!(concat!(env!("OUT_DIR"), "/pext.rs"));
 include!(concat!(env!("OUT_DIR"), "/magic.rs"));
 
 #[cfg(target_feature = "bmi2")]
-pub fn gen_rook_moves(piece: Square, blockers: BitBoard) -> BitBoard {
+pub fn rook_slides(piece: Square, blockers: BitBoard) -> BitBoard {
     use std::arch::x86_64::{_pdep_u64, _pext_u64};
 
     let metadata = CROSS_META[piece];
@@ -23,7 +23,7 @@ pub fn gen_rook_moves(piece: Square, blockers: BitBoard) -> BitBoard {
 }
 
 #[cfg(target_feature = "bmi2")]
-pub fn gen_bishop_moves(piece: Square, blockers: BitBoard) -> BitBoard {
+pub fn bishop_slides(piece: Square, blockers: BitBoard) -> BitBoard {
     use std::arch::x86_64::{_pdep_u64, _pext_u64};
 
     let metadata = DIAGONAL_META[piece];
@@ -38,15 +38,23 @@ pub fn gen_bishop_moves(piece: Square, blockers: BitBoard) -> BitBoard {
 }
 
 #[cfg(not(target_feature = "bmi2"))]
-pub fn gen_rook_moves(piece: Square, blockers: BitBoard) -> BitBoard {
-    let metadata = CROSS_METADATA[piece];
+pub fn rook_slides(piece: Square, blockers: BitBoard) -> BitBoard {
+    let metadata = CROSS_META[piece];
     SLIDES[metadata.offset
         + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 12)) as usize]
 }
 
 #[cfg(not(target_feature = "bmi2"))]
-pub fn gen_bishop_moves(piece: Square, blockers: BitBoard) -> BitBoard {
-    let metadata = DIAGONAL_METADATA[piece];
+pub fn bishop_slides(piece: Square, blockers: BitBoard) -> BitBoard {
+    let metadata = DIAGONAL_META[piece];
     SLIDES[metadata.offset
         + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 9)) as usize]
+}
+
+pub fn knight_attacks(piece: Square) -> BitBoard {
+    KNIGHT_ATTACKS[piece]
+}
+
+pub fn king_attacks(piece: Square) -> BitBoard {
+    KING_ATTACKS[piece]
 }

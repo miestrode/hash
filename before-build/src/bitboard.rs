@@ -6,6 +6,23 @@ use std::{
 
 use crate::square::Square;
 
+#[macro_export]
+macro_rules! bb {
+    ($line0:tt $line1:tt $line2:tt $line3:tt $line4:tt $line5:tt $line6:tt $line7:tt) => {
+        BitBoard(
+            ($line0 << 56)
+                | ($line1 << 48)
+                | ($line2 << 40)
+                | ($line3 << 32)
+                | ($line4 << 24)
+                | ($line5 << 16)
+                | ($line6 << 8)
+                | $line7,
+        )
+        .h_flip()
+    };
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BitBoard(pub u64);
 
@@ -49,6 +66,7 @@ impl Iterator for BitIter {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum Orientation {
     BottomToTop,
     TopToBottom,
@@ -67,13 +85,159 @@ impl Not for Orientation {
 
 impl BitBoard {
     pub const EMPTY: Self = Self(0);
-    pub const A_FILE: Self = Self(0x0101010101010101);
-    pub const H_FILE: Self = Self(0x8080808080808080);
-    pub const RANK_8: Self = Self(0xFF00000000000000);
-    pub const RANK_1: Self = Self(0x00000000000000FF);
+
+    pub const FULL: Self = !Self::EMPTY;
+
+    pub const A_FILE: Self = bb!(
+        10000000
+        10000000
+        10000000
+        10000000
+        10000000
+        10000000
+        10000000
+        10000000
+    );
+
+    pub const H_FILE: Self = bb!(
+        00000001
+        00000001
+        00000001
+        00000001
+        00000001
+        00000001
+        00000001
+        00000001
+    );
+
+    pub const EDGE_FILES: Self = Self::A_FILE + Self::H_FILE;
+
+    pub const RANK_1: Self = bb!(
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        11111111
+    );
+
+    pub const RANK_2: Self = bb!(
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        11111111
+        00000000
+    );
+
+    pub const BOTTOM_RANKS: Self = Self::RANK_1 + Self::RANK_2;
+
+    pub const TOP_RANKS: Self = Self::RANK_7 + Self::RANK_8;
+
+    pub const RANK_8: Self = bb!(
+        11111111
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+    );
+
+    pub const RANK_7: Self = bb!(
+        00000000
+        11111111
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+    );
+
+    // Used to check both if a piece attacks a spot between the king and rook and if the space
+    // between them is empty.
+    pub const BOTTOM_KS_SPACE: Self = bb!(
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00001110
+    );
+
+    // Used to check if there are any pieces between the rook and king
+    pub const BOTTOM_QS_MOVE_SPACE: Self = bb!(
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        01111000
+    );
+
+    // Used to check if there are any attacks between the king and the king's final spot
+    pub const BOTTOM_QS_DANGER_SPACE: Self = bb!(
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00000000
+        00111000
+    );
+
+    pub const TOP_KS_SPACE: Self = Self::BOTTOM_KS_SPACE.v_flip();
+
+    pub const TOP_QS_MOVE_SPACE: Self = Self::BOTTOM_QS_MOVE_SPACE.v_flip();
+
+    pub const TOP_QS_DANGER_SPACE: Self = Self::BOTTOM_QS_DANGER_SPACE.v_flip();
+
+    pub const EDGE_RANKS: Self = Self::RANK_1 + Self::RANK_8;
+
+    pub const PAWN_START_RANKS: Self = Self::RANK_2 + Self::RANK_7;
+
+    pub fn ks_space(orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => Self::BOTTOM_KS_SPACE,
+            Orientation::TopToBottom => Self::TOP_KS_SPACE,
+        }
+    }
+
+    pub fn qs_move_space(orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => Self::BOTTOM_QS_MOVE_SPACE,
+            Orientation::TopToBottom => Self::TOP_QS_MOVE_SPACE,
+        }
+    }
+
+    pub fn qs_danger_space(orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => Self::BOTTOM_QS_DANGER_SPACE,
+            Orientation::TopToBottom => Self::TOP_QS_DANGER_SPACE,
+        }
+    }
+
+    pub fn is_full(&self) -> bool {
+        *self == Self::FULL
+    }
 
     pub fn is_empty(&self) -> bool {
         *self == Self::EMPTY
+    }
+
+    pub fn isnt_empty(&self) -> bool {
+        *self != Self::EMPTY
     }
 
     // NOTE: This function does include the empty set, unlike the partial subset iterator, and goes
@@ -85,7 +249,7 @@ impl BitBoard {
         })
     }
 
-    pub fn bits(&self) -> impl Iterator<Item = Square> {
+    pub fn bits(&self) -> BitIter {
         BitIter { bitboard: *self }
     }
 
@@ -100,43 +264,59 @@ impl BitBoard {
         Square(square)
     }
 
+    pub fn first_one_as_square(&self) -> Square {
+        Square(self.0.trailing_zeros())
+    }
+
     pub fn ones(&self) -> u32 {
         self.0.count_ones()
     }
 
-    pub fn move_one_up(self, o: Orientation) -> Self {
-        match o {
+    pub fn move_one_up(self, orientation: Orientation) -> Self {
+        match orientation {
             Orientation::BottomToTop => (self - Self::RANK_8) >> 8,
             Orientation::TopToBottom => (self - Self::RANK_1) << 8,
         }
     }
 
-    pub fn move_one_down(self, o: Orientation) -> Self {
-        self.move_one_up(!o)
+    pub fn move_two_up(self, orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => (self - Self::TOP_RANKS) >> 16,
+            Orientation::TopToBottom => (self - Self::BOTTOM_RANKS) << 16,
+        }
     }
 
-    pub fn move_one_right(self) -> Self {
-        (self - Self::H_FILE) >> 1
+    // TODO: Heavy doubt, but maybe just a match would be faster? This should be tested
+    pub fn move_one_down(self, orientation: Orientation) -> Self {
+        self.move_one_up(!orientation)
     }
 
-    pub fn move_one_left(self) -> Self {
-        (self - Self::A_FILE) << 1
+    pub fn move_one_right(self, orientation: Orientation) -> Self {
+        match orientation {
+            Orientation::BottomToTop => (self - Self::H_FILE) >> 1,
+            Orientation::TopToBottom => (self - Self::A_FILE) << 1,
+        }
     }
 
-    pub fn move_one_up_right(self, o: Orientation) -> Self {
-        self.move_one_up(o).move_one_right()
+    // TODO: Heavy doubt, but maybe just a match would be faster? This should be tested
+    pub fn move_one_left(self, orientation: Orientation) -> Self {
+        self.move_one_right(!orientation)
     }
 
-    pub fn move_one_up_left(self, o: Orientation) -> Self {
-        self.move_one_up(o).move_one_left()
+    pub fn move_one_up_right(self, orientation: Orientation) -> Self {
+        self.move_one_up(orientation).move_one_right(orientation)
     }
 
-    pub fn move_one_down_left(self, o: Orientation) -> Self {
-        self.move_one_down(o).move_one_left()
+    pub fn move_one_up_left(self, orientation: Orientation) -> Self {
+        self.move_one_up(orientation).move_one_left(orientation)
     }
 
-    pub fn move_one_down_right(self, o: Orientation) -> Self {
-        self.move_one_down(o).move_one_right()
+    pub fn move_one_down_left(self, orientation: Orientation) -> Self {
+        self.move_one_down(orientation).move_one_left(orientation)
+    }
+
+    pub fn move_one_down_right(self, orientation: Orientation) -> Self {
+        self.move_one_down(orientation).move_one_right(orientation)
     }
 
     pub fn count_ones(&self) -> u32 {
@@ -147,17 +327,61 @@ impl BitBoard {
         *self & square.as_bitboard() != BitBoard::EMPTY
     }
 
+    pub fn toggle_bit(&mut self, square: Square) {
+        self.0 ^= square.as_bitboard().0;
+    }
+
     // Taken from https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#Horizontal
-    pub fn h_flip(self) -> Self {
+    pub const fn h_flip(self) -> Self {
         let k_1 = 0x5555555555555555;
         let k_2 = 0x3333333333333333;
         let k_4 = 0x0f0f0f0f0f0f0f0f;
-        
+
         let mut x = self.0;
         x = ((x >> 1) & k_1) + 2 * (x & k_1);
         x = ((x >> 2) & k_2) + 4 * (x & k_2);
-        
-        BitBoard(((x >> 4) & k_4) + 16 * (x & k_4))
+
+        Self(((x >> 4) & k_4) + 16 * (x & k_4))
+    }
+
+    pub const fn v_flip(self) -> Self {
+        Self(self.0.swap_bytes())
+    }
+
+    /*
+    1) When a one has a one below it, it becomes one.
+    2) Otherwise, the cell stays as it is.
+
+    In other words, we need the "or" function.
+    */
+    pub fn smear_ones_up(self, orientation: Orientation) -> Self {
+        self.move_one_up(orientation) + self
+    }
+}
+
+impl IntoIterator for BitBoard {
+    type Item = Square;
+
+    type IntoIter = BitIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.bits()
+    }
+}
+
+impl const Not for BitBoard {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self(!self.0)
+    }
+}
+
+impl BitAnd for BitBoard {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
     }
 }
 
@@ -166,7 +390,7 @@ impl Sub for BitBoard {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        BitBoard(self.0 & !rhs.0)
+        self & !rhs
     }
 }
 
@@ -175,15 +399,7 @@ impl const Add for BitBoard {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        BitBoard(self.0 | rhs.0)
-    }
-}
-
-impl BitAnd for BitBoard {
-    type Output = Self;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        BitBoard(self.0 & rhs.0)
+        Self(self.0 | rhs.0)
     }
 }
 
@@ -232,20 +448,4 @@ impl Display for BitBoard {
 
         Ok(())
     }
-}
-
-#[macro_export]
-macro_rules! bb {
-    ($line0:tt $line1:tt $line2:tt $line3:tt $line4:tt $line5:tt $line6:tt $line7:tt) => {
-        BitBoard(
-            ($line0 << 56)
-                | ($line1 << 48)
-                | ($line2 << 40)
-                | ($line3 << 32)
-                | ($line4 << 24)
-                | ($line5 << 16)
-                | ($line6 << 8)
-                | $line7,
-        ).h_flip()
-    };
 }
