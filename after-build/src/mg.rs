@@ -3,7 +3,7 @@ use before_build::{BitBoard, Orientation, Square};
 
 use crate::{
     index,
-    repr::{Board, Color, EpData, Move, PieceKind},
+    repr::{Board, EpData, Move, PieceKind},
 };
 
 type Moves = ArrayVec<Move, 218>;
@@ -93,6 +93,7 @@ impl Gen for Pawn {
                         origin: unsafe { target.move_one_down_unchecked(orientation) },
                         target,
                         is_double_push: false,
+                        moved_kind: PieceKind::Pawn,
                     })
                 }
             }
@@ -111,6 +112,7 @@ impl Gen for Pawn {
                 origin: unsafe { target.move_two_down_unchecked(orientation) },
                 target,
                 is_double_push: true,
+                moved_kind: PieceKind::Pawn,
             }));
         }
 
@@ -128,6 +130,7 @@ impl Gen for Pawn {
                 origin: unsafe { target.move_one_down_left_unchecked(orientation) },
                 target,
                 is_double_push: false,
+                moved_kind: PieceKind::Pawn,
             }));
         }
 
@@ -145,6 +148,7 @@ impl Gen for Pawn {
                 origin: unsafe { target.move_one_down_right_unchecked(orientation) },
                 target,
                 is_double_push: false,
+                moved_kind: PieceKind::Pawn,
             }));
         }
 
@@ -222,6 +226,7 @@ impl Gen for Knight {
                 origin: piece,
                 target,
                 is_double_push: false,
+                moved_kind: PieceKind::Knight,
             }))
         }
     }
@@ -252,12 +257,14 @@ impl Gen for Bishop {
         // One for unpinned bishops
         for bishop in valid_bishops - board.current_player.pins.diagonal_pins() {
             moves.extend(
-                (index::bishop_slides(bishop, occupation) - board.current_player.occupation)
+                ((index::bishop_slides(bishop, occupation) - board.current_player.occupation)
+                    & board.current_player.valid_targets)
                     .bits()
                     .map(|target| Move::Simple {
                         origin: bishop,
                         target,
                         is_double_push: false,
+                        moved_kind: PieceKind::Bishop,
                     }),
             );
         }
@@ -265,14 +272,15 @@ impl Gen for Bishop {
         // One for pinned bishops
         for bishop in valid_bishops & board.current_player.pins.diagonal_pins() {
             moves.extend(
-                ((index::bishop_slides(bishop, occupation)
-                    & board.current_player.pins.diagonal_pins())
-                    - board.current_player.valid_targets)
+                (index::bishop_slides(bishop, occupation)
+                    & board.current_player.pins.diagonal_pins()
+                    & board.current_player.valid_targets)
                     .bits()
                     .map(|target| Move::Simple {
                         origin: bishop,
                         target,
                         is_double_push: false,
+                        moved_kind: PieceKind::Bishop,
                     }),
             );
         }
@@ -304,12 +312,14 @@ impl Gen for Rook {
         // One for unpinned rooks
         for rook in valid_rooks - board.current_player.pins.cross_pins() {
             moves.extend(
-                (index::rook_slides(rook, occupation) - board.current_player.occupation)
+                ((index::rook_slides(rook, occupation) - board.current_player.occupation)
+                    & board.current_player.valid_targets)
                     .bits()
                     .map(|target| Move::Simple {
                         origin: rook,
                         target,
                         is_double_push: false,
+                        moved_kind: PieceKind::Rook,
                     }),
             );
         }
@@ -318,12 +328,13 @@ impl Gen for Rook {
         for rook in valid_rooks & board.current_player.pins.cross_pins() {
             moves.extend(
                 ((index::rook_slides(rook, occupation) & board.current_player.pins.cross_pins())
-                    - board.current_player.valid_targets)
+                    & board.current_player.valid_targets)
                     .bits()
                     .map(|target| Move::Simple {
                         origin: rook,
                         target,
                         is_double_push: false,
+                        moved_kind: PieceKind::Rook,
                     }),
             );
         }
@@ -362,6 +373,7 @@ impl Gen for Queen {
                     origin: queen,
                     target,
                     is_double_push: false,
+                    moved_kind: PieceKind::Queen,
                 }),
             );
         }
@@ -377,6 +389,7 @@ impl Gen for Queen {
                     origin: queen,
                     target,
                     is_double_push: false,
+                    moved_kind: PieceKind::Queen,
                 }),
             );
         }
@@ -392,6 +405,7 @@ impl Gen for Queen {
                         origin: queen,
                         target,
                         is_double_push: false,
+                        moved_kind: PieceKind::Queen,
                     }),
             );
         }
@@ -429,6 +443,7 @@ impl Gen for King {
                         origin,
                         target,
                         is_double_push: false,
+                        moved_kind: PieceKind::King,
                     }),
             );
         }
@@ -453,12 +468,11 @@ impl Gen for King {
     }
 }
 
-fn gen_dangers(board: &mut Board) {
-    let occupation = board.current_player.occupation + board.opposing_player.occupation;
-    let orientation = match board.playing_side {
-        Color::White => Orientation::TopToBottom,
-        Color::Black => Orientation::BottomToTop,
-    };
+pub fn gen_dangers(board: &mut Board) {
+    board.current_player.dangers = BitBoard::EMPTY;
+    let occupation = board.current_player.occupation + board.opposing_player.occupation
+        - board.current_player.king;
+    let orientation = !board.orientation;
 
     Pawn::dangers(
         board.opposing_player.pawns,
@@ -498,23 +512,19 @@ fn gen_dangers(board: &mut Board) {
     );
 }
 
-fn gen_moves(board: &Board) -> Moves {
+pub fn gen_moves(board: &Board) -> Moves {
     let mut moves = Moves::new();
     let occupation = board.current_player.occupation + board.opposing_player.occupation;
-    let orientation = match board.playing_side {
-        Color::White => Orientation::BottomToTop,
-        Color::Black => Orientation::TopToBottom,
-    };
 
     if !board.current_player.king_must_move {
-        Pawn::legal_moves(board, occupation, orientation, &mut moves);
-        Knight::legal_moves(board, occupation, orientation, &mut moves);
-        Bishop::legal_moves(board, occupation, orientation, &mut moves);
-        Rook::legal_moves(board, occupation, orientation, &mut moves);
-        Queen::legal_moves(board, occupation, orientation, &mut moves);
+        Pawn::legal_moves(board, occupation, board.orientation, &mut moves);
+        Knight::legal_moves(board, occupation, board.orientation, &mut moves);
+        Bishop::legal_moves(board, occupation, board.orientation, &mut moves);
+        Rook::legal_moves(board, occupation, board.orientation, &mut moves);
+        Queen::legal_moves(board, occupation, board.orientation, &mut moves);
     }
 
-    King::legal_moves(board, occupation, orientation, &mut moves);
+    King::legal_moves(board, occupation, board.orientation, &mut moves);
 
     moves
 }

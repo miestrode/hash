@@ -1,8 +1,13 @@
-use std::ops::{Index, IndexMut};
+use std::{
+    fmt::{Display, Write},
+    hint::unreachable_unchecked,
+    ops::{Index, IndexMut},
+    str::FromStr,
+};
 
 use crate::{bitboard::BitBoard, Orientation};
 
-#[derive(Clone, Copy)]
+#[derive(Eq, Hash, Clone, Copy, PartialEq)]
 pub struct Square(pub u32);
 
 impl Square {
@@ -138,6 +143,15 @@ impl Square {
         Self::H8,
     ];
 
+    pub const BOTTOM_LEFT_ROOK: Self = Self::A1;
+    pub const TOP_LEFT_ROOK: Self = Self::A8;
+
+    pub const BOTTOM_RIGHT_ROOK: Self = Self::H1;
+    pub const TOP_RIGHT_ROOK: Self = Self::H8;
+
+    pub const BOTTOM_KING: Self = Self::E1;
+    pub const TOP_KING: Self = Self::E8;
+
     pub fn as_bitboard(&self) -> BitBoard {
         BitBoard(1 << self.0)
     }
@@ -179,7 +193,33 @@ impl Square {
 
     pub fn rank(&self) -> u32 {
         self.0 / 8
-   }
+    }
+
+    pub fn file(&self) -> u32 {
+        self.0 % 8
+    }
+
+    pub fn as_index(&self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl Display for Square {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_char(match self.file() {
+            0 => 'a',
+            1 => 'b',
+            2 => 'c',
+            3 => 'd',
+            4 => 'e',
+            5 => 'f',
+            6 => 'g',
+            7 => 'h',
+            // SAFETY: The file must be from 0 to 7
+            _ => unsafe { unreachable_unchecked() },
+        })?;
+        f.write_fmt(format_args!("{}", self.rank() + 1))
+    }
 }
 
 impl<T> Index<Square> for [T; 64] {
@@ -206,5 +246,41 @@ impl<T> Index<Square> for Vec<T> {
 impl<T> IndexMut<Square> for Vec<T> {
     fn index_mut(&mut self, index: Square) -> &mut Self::Output {
         &mut self[index.0 as usize]
+    }
+}
+
+impl FromStr for Square {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 2 {
+            Err("Input must contain two characters")
+        } else {
+            let mut characters = s.chars();
+
+            Ok(Self(
+                match characters.next().unwrap() {
+                    'a' => 0,
+                    'b' => 1,
+                    'c' => 2,
+                    'd' => 3,
+                    'e' => 4,
+                    'f' => 5,
+                    'g' => 6,
+                    'h' => 7,
+                    _ => return Err("Input's column descriptor must be a character from a to h"),
+                } + match characters.next().unwrap() {
+                    '1' => 0,
+                    '2' => 8,
+                    '3' => 16,
+                    '4' => 24,
+                    '5' => 32,
+                    '6' => 40,
+                    '7' => 48,
+                    '8' => 56,
+                    _ => return Err("Input's row descriptor must be a digit from 1 to 8"),
+                },
+            ))
+        }
     }
 }

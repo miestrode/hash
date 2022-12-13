@@ -89,49 +89,49 @@ impl BitBoard {
     pub const FULL: Self = !Self::EMPTY;
 
     pub const A_FILE: Self = bb!(
-        10000000
-        10000000
-        10000000
-        10000000
-        10000000
-        10000000
-        10000000
-        10000000
+        0b10000000
+        0b10000000
+        0b10000000
+        0b10000000
+        0b10000000
+        0b10000000
+        0b10000000
+        0b10000000
     );
 
     pub const H_FILE: Self = bb!(
-        00000001
-        00000001
-        00000001
-        00000001
-        00000001
-        00000001
-        00000001
-        00000001
+        0b00000001
+        0b00000001
+        0b00000001
+        0b00000001
+        0b00000001
+        0b00000001
+        0b00000001
+        0b00000001
     );
 
     pub const EDGE_FILES: Self = Self::A_FILE + Self::H_FILE;
 
     pub const RANK_1: Self = bb!(
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        11111111
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b11111111
     );
 
     pub const RANK_2: Self = bb!(
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        11111111
-        00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b11111111
+        0b00000000
     );
 
     pub const BOTTOM_RANKS: Self = Self::RANK_1 + Self::RANK_2;
@@ -139,62 +139,62 @@ impl BitBoard {
     pub const TOP_RANKS: Self = Self::RANK_7 + Self::RANK_8;
 
     pub const RANK_8: Self = bb!(
-        11111111
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
+        0b11111111
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
     );
 
     pub const RANK_7: Self = bb!(
-        00000000
-        11111111
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
+        0b00000000
+        0b11111111
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
     );
 
     // Used to check both if a piece attacks a spot between the king and rook and if the space
     // between them is empty.
     pub const BOTTOM_KS_SPACE: Self = bb!(
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00001110
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00001110
     );
 
     // Used to check if there are any pieces between the rook and king
     pub const BOTTOM_QS_MOVE_SPACE: Self = bb!(
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        01111000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b01111000
     );
 
     // Used to check if there are any attacks between the king and the king's final spot
     pub const BOTTOM_QS_DANGER_SPACE: Self = bb!(
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00000000
-        00111000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00111000
     );
 
     pub const TOP_KS_SPACE: Self = Self::BOTTOM_KS_SPACE.v_flip();
@@ -226,6 +226,10 @@ impl BitBoard {
             Orientation::BottomToTop => Self::BOTTOM_QS_DANGER_SPACE,
             Orientation::TopToBottom => Self::TOP_QS_DANGER_SPACE,
         }
+    }
+
+    pub fn is_single_one(&self) -> bool {
+        self.0.is_power_of_two()
     }
 
     pub fn is_full(&self) -> bool {
@@ -324,7 +328,7 @@ impl BitBoard {
     }
 
     pub fn get_bit(&self, square: Square) -> bool {
-        *self & square.as_bitboard() != BitBoard::EMPTY
+        (*self & square.as_bitboard()) != BitBoard::EMPTY
     }
 
     pub fn toggle_bit(&mut self, square: Square) {
