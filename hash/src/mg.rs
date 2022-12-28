@@ -6,7 +6,7 @@ use crate::{
     repr::{Board, EpData, Move, PieceKind},
 };
 
-type Moves = ArrayVec<Move, 218>;
+type Moves = ArrayVec<Move, 256>;
 
 pub trait Gen {
     fn dangers(
