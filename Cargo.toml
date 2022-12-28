@@ -2,4 +2,4 @@
 lto = true
 
 [workspace]
-members = ["before-build", "after-build"]
+members = ["hash-build", "hash"]
