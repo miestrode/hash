@@ -1,5 +1,6 @@
 [profile.release]
+debug = true
 lto = true
 
 [workspace]
-members = ["hash-build", "hash"]
+members = ["hash-build", "hash-core", "hash-eval", "hash-search"]

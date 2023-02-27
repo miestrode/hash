@@ -1,7 +1,8 @@
 #![feature(const_trait_impl)]
 use std::{env, fmt::Debug, fs, io::Error, path::PathBuf};
 
-use hash_build::{BitBoard, Orientation, Square};
+use hash_build::{BitBoard, Square, ZobristMap, Color};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 // Used for updating the structure based on build flags.
 #[derive(Clone, Copy, Debug)]
@@ -49,16 +50,16 @@ pub fn gen_separated_cross_slides(
 ) -> (BitBoard, BitBoard, BitBoard, BitBoard) {
     (
         gen_ray(pieces, blockers, |state| {
-            BitBoard::move_one_up(state, Orientation::BottomToTop)
+            BitBoard::move_one_up(state, Color::White)
         }),
         gen_ray(pieces, blockers, |state| {
-            BitBoard::move_one_right(state, Orientation::BottomToTop)
+            BitBoard::move_one_right(state, Color::White)
         }),
         gen_ray(pieces, blockers, |state| {
-            BitBoard::move_one_down(state, Orientation::BottomToTop)
+            BitBoard::move_one_down(state, Color::White)
         }),
         gen_ray(pieces, blockers, |state| {
-            BitBoard::move_one_left(state, Orientation::BottomToTop)
+            BitBoard::move_one_left(state, Color::White)
         }),
     )
 }
@@ -76,17 +77,17 @@ pub fn gen_separated_diagonal_slides(
     blockers: BitBoard,
 ) -> (BitBoard, BitBoard, BitBoard, BitBoard) {
     (
-        gen_ray(pieces, blockers, |s| {
-            BitBoard::move_one_up_left(s, Orientation::BottomToTop)
+        gen_ray(pieces, blockers, |state| {
+            BitBoard::move_one_up_left(state, Color::White)
         }),
-        gen_ray(pieces, blockers, |s| {
-            BitBoard::move_one_up_right(s, Orientation::BottomToTop)
+        gen_ray(pieces, blockers, |state| {
+            BitBoard::move_one_up_right(state, Color::White)
         }),
-        gen_ray(pieces, blockers, |s| {
-            BitBoard::move_one_down_right(s, Orientation::BottomToTop)
+        gen_ray(pieces, blockers, |state| {
+            BitBoard::move_one_down_right(state, Color::White)
         }),
-        gen_ray(pieces, blockers, |s| {
-            BitBoard::move_one_down_left(s, Orientation::BottomToTop)
+        gen_ray(pieces, blockers, |state| {
+            BitBoard::move_one_down_left(state, Color::White)
         }),
     )
 }
@@ -99,26 +100,26 @@ pub fn gen_diagonal_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
 }
 
 pub fn gen_knight_index(piece: BitBoard) -> BitBoard {
-    let top = piece.move_one_up(Orientation::BottomToTop);
-    let bottom = piece.move_one_down(Orientation::BottomToTop);
-    let left = piece.move_one_left(Orientation::BottomToTop);
-    let right = piece.move_one_right(Orientation::BottomToTop);
+    let top = piece.move_one_up(Color::White);
+    let bottom = piece.move_one_down(Color::White);
+    let left = piece.move_one_left(Color::White);
+    let right = piece.move_one_right(Color::White);
 
-    top.move_one_up_right(Orientation::BottomToTop)
-        + top.move_one_up_left(Orientation::BottomToTop)
-        + left.move_one_up_left(Orientation::BottomToTop)
-        + left.move_one_down_left(Orientation::BottomToTop)
-        + bottom.move_one_down_left(Orientation::BottomToTop)
-        + bottom.move_one_down_right(Orientation::BottomToTop)
-        + right.move_one_up_right(Orientation::BottomToTop)
-        + right.move_one_down_right(Orientation::BottomToTop)
+    top.move_one_up_right(Color::White)
+        + top.move_one_up_left(Color::White)
+        + left.move_one_up_left(Color::White)
+        + left.move_one_down_left(Color::White)
+        + bottom.move_one_down_left(Color::White)
+        + bottom.move_one_down_right(Color::White)
+        + right.move_one_up_right(Color::White)
+        + right.move_one_down_right(Color::White)
 }
 
 pub fn gen_king_index(piece: BitBoard) -> BitBoard {
-    let line = piece.move_one_left(Orientation::BottomToTop)
+    let line = piece.move_one_left(Color::White)
         + piece
-        + piece.move_one_right(Orientation::BottomToTop);
-    line.move_one_up(Orientation::BottomToTop) + line + line.move_one_down(Orientation::BottomToTop)
+        + piece.move_one_right(Color::White);
+    line.move_one_up(Color::White) + line + line.move_one_down(Color::White)
         - piece
 }
 
@@ -151,6 +152,10 @@ fn stringify_table<T: Debug>(name: &'static str, data_type: &'static str, data: 
 
     output.push_str("];");
     output
+}
+
+fn stringify_variable<T: Debug>(name: &'static str, data_type: &'static str, data: T) -> String {
+    format!("static {name}: {data_type} = {data:?};")
 }
 
 fn main() -> Result<(), Error> {
@@ -213,6 +218,7 @@ fn main() -> Result<(), Error> {
         }
 
         let pext_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("pext.rs");
+
         let (cross_data, cross_meta) = gen_slide_table(gen_cross_mask, gen_cross_slides);
         let separated_cross_data =
             gen_separated_slide_table(gen_cross_mask, gen_separated_cross_slides);
@@ -444,6 +450,7 @@ fn main() -> Result<(), Error> {
         );
 
         let magic_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("magic.rs");
+
         fs::write(
             magic_file,
             stringify_table("SLIDES", "BitBoard", &table)
@@ -458,6 +465,7 @@ fn main() -> Result<(), Error> {
     }
 
     let table_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("table.rs");
+
     fs::write(
         table_file,
         stringify_table(
@@ -465,6 +473,17 @@ fn main() -> Result<(), Error> {
             "BitBoard",
             &gen_piece_table(gen_knight_index),
         ) + &stringify_table("KING_ATTACKS", "BitBoard", &gen_piece_table(gen_king_index)),
+    )?;
+
+    let generic_output_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("out.rs");
+
+    fs::write(
+        generic_output_file,
+        stringify_variable(
+            "ZOBRIST_MAP",
+            "ZobristMap",
+            StdRng::seed_from_u64(0x73130172E6DEA605).gen::<ZobristMap>(),
+        ),
     )?;
 
     println!("cargo:rerun-if-changed=build.rs");

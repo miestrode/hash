@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{bitboard::BitBoard, Orientation};
+use crate::{bitboard::BitBoard, Color};
 
 #[derive(Eq, Hash, Clone, Copy, PartialEq)]
 pub struct Square(pub u32);
@@ -156,38 +156,38 @@ impl Square {
         BitBoard(1 << self.0)
     }
 
-    pub unsafe fn move_one_down_unchecked(&self, orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => Self(self.0 - 8),
-            Orientation::TopToBottom => Self(self.0 + 8),
+    pub unsafe fn move_one_down_unchecked(&self, color: Color) -> Self {
+        match color {
+            Color::White => Self(self.0 - 8),
+            Color::Black => Self(self.0 + 8),
         }
     }
 
-    pub unsafe fn move_two_down_unchecked(&self, orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => Self(self.0 - 16),
-            Orientation::TopToBottom => Self(self.0 + 16),
+    pub unsafe fn move_two_down_unchecked(&self, color: Color) -> Self {
+        match color {
+            Color::White => Self(self.0 - 16),
+            Color::Black => Self(self.0 + 16),
         }
     }
 
-    pub unsafe fn move_one_down_left_unchecked(&self, orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => Self(self.0 - 9),
-            Orientation::TopToBottom => Self(self.0 + 9),
+    pub unsafe fn move_one_down_left_unchecked(&self, color: Color) -> Self {
+        match color {
+            Color::White => Self(self.0 - 9),
+            Color::Black => Self(self.0 + 9),
         }
     }
 
-    pub unsafe fn move_one_down_right_unchecked(&self, orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => Self(self.0 - 7),
-            Orientation::TopToBottom => Self(self.0 + 7),
+    pub unsafe fn move_one_down_right_unchecked(&self, color: Color) -> Self {
+        match color {
+            Color::White => Self(self.0 - 7),
+            Color::Black => Self(self.0 + 7),
         }
     }
 
-    pub unsafe fn move_one_up_unchecked(&self, orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => Self(self.0 + 8),
-            Orientation::TopToBottom => Self(self.0 - 8),
+    pub unsafe fn move_one_up_unchecked(&self, color: Color) -> Self {
+        match color {
+            Color::White => Self(self.0 + 8),
+            Color::Black => Self(self.0 - 8),
         }
     }
 
@@ -226,26 +226,26 @@ impl<T> Index<Square> for [T; 64] {
     type Output = T;
 
     fn index(&self, index: Square) -> &Self::Output {
-        &self[index.0 as usize]
+        unsafe { self.get_unchecked(index.0 as usize) }
     }
 }
 
 impl<T> IndexMut<Square> for [T; 64] {
     fn index_mut(&mut self, index: Square) -> &mut Self::Output {
-        &mut self[index.0 as usize]
+        unsafe { self.get_unchecked_mut(index.0 as usize) }
     }
 }
 impl<T> Index<Square> for Vec<T> {
     type Output = T;
 
     fn index(&self, index: Square) -> &Self::Output {
-        &self[index.0 as usize]
+        unsafe { self.get_unchecked(index.0 as usize) }
     }
 }
 
 impl<T> IndexMut<Square> for Vec<T> {
     fn index_mut(&mut self, index: Square) -> &mut Self::Output {
-        &mut self[index.0 as usize]
+        unsafe { self.get_unchecked_mut(index.0 as usize) }
     }
 }
 

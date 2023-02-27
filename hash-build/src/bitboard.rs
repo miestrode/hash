@@ -2,6 +2,7 @@ use std::{
     fmt::{self, Display, Formatter, Write},
     iter,
     ops::{Add, AddAssign, BitAnd, Not, Shl, Shr, Sub},
+    str::FromStr,
 };
 
 use crate::square::Square;
@@ -23,7 +24,7 @@ macro_rules! bb {
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BitBoard(pub u64);
 
 // Called "partial", because it doesn't include the empty set as a subset of the relevant bitboard.
@@ -67,19 +68,45 @@ impl Iterator for BitIter {
 }
 
 #[derive(Clone, Copy)]
-pub enum Orientation {
-    BottomToTop,
-    TopToBottom,
+pub enum Color {
+    White,
+    Black,
 }
 
-impl Not for Orientation {
-    type Output = Orientation;
+impl Not for Color {
+    type Output = Self;
 
     fn not(self) -> Self::Output {
         match self {
-            Orientation::BottomToTop => Orientation::TopToBottom,
-            Orientation::TopToBottom => Orientation::BottomToTop,
+            Self::White => Self::Black,
+            Self::Black => Self::White,
         }
+    }
+}
+
+impl FromStr for Color {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 1 {
+            Err("Input must contain a single character")
+        } else {
+            match s.chars().next().unwrap() {
+                'w' => Ok(Color::White),
+                'b' => Ok(Color::Black),
+                _ => Err("Input must be a 'w' or 'b'"),
+            }
+        }
+    }
+}
+
+impl Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Color::White => 'w',
+            Color::Black => 'b',
+        }
+        .fmt(f)
     }
 }
 
@@ -207,24 +234,24 @@ impl BitBoard {
 
     pub const PAWN_START_RANKS: Self = Self::RANK_2 + Self::RANK_7;
 
-    pub fn ks_space(orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => Self::BOTTOM_KS_SPACE,
-            Orientation::TopToBottom => Self::TOP_KS_SPACE,
+    pub fn ks_space(color: Color) -> Self {
+        match color {
+            Color::White => Self::BOTTOM_KS_SPACE,
+            Color::Black => Self::TOP_KS_SPACE,
         }
     }
 
-    pub fn qs_move_space(orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => Self::BOTTOM_QS_MOVE_SPACE,
-            Orientation::TopToBottom => Self::TOP_QS_MOVE_SPACE,
+    pub fn qs_move_space(color: Color) -> Self {
+        match color {
+            Color::White => Self::BOTTOM_QS_MOVE_SPACE,
+            Color::Black => Self::TOP_QS_MOVE_SPACE,
         }
     }
 
-    pub fn qs_danger_space(orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => Self::BOTTOM_QS_DANGER_SPACE,
-            Orientation::TopToBottom => Self::TOP_QS_DANGER_SPACE,
+    pub fn qs_danger_space(color: Color) -> Self {
+        match color {
+            Color::White => Self::BOTTOM_QS_DANGER_SPACE,
+            Color::Black => Self::TOP_QS_DANGER_SPACE,
         }
     }
 
@@ -261,14 +288,14 @@ impl BitBoard {
         debug_assert!(!self.is_empty());
 
         let square = self.0.trailing_zeros();
-
-        // PERF: Consider switching this to (self.0 & self.0 - 1), in case performance is better
-        self.0 ^= 1 << square;
+        self.0 = self.0 & (self.0 - 1);
 
         Square(square)
     }
 
     pub fn first_one_as_square(&self) -> Square {
+        debug_assert!(!self.is_empty());
+
         Square(self.0.trailing_zeros())
     }
 
@@ -276,51 +303,51 @@ impl BitBoard {
         self.0.count_ones()
     }
 
-    pub fn move_one_up(self, orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => (self - Self::RANK_8) >> 8,
-            Orientation::TopToBottom => (self - Self::RANK_1) << 8,
+    pub fn move_one_up(self, color: Color) -> Self {
+        match color {
+            Color::White => (self - Self::RANK_8) >> 8,
+            Color::Black => (self - Self::RANK_1) << 8,
         }
     }
 
-    pub fn move_two_up(self, orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => (self - Self::TOP_RANKS) >> 16,
-            Orientation::TopToBottom => (self - Self::BOTTOM_RANKS) << 16,
-        }
-    }
-
-    // TODO: Heavy doubt, but maybe just a match would be faster? This should be tested
-    pub fn move_one_down(self, orientation: Orientation) -> Self {
-        self.move_one_up(!orientation)
-    }
-
-    pub fn move_one_right(self, orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::BottomToTop => (self - Self::H_FILE) >> 1,
-            Orientation::TopToBottom => (self - Self::A_FILE) << 1,
+    pub fn move_two_up(self, color: Color) -> Self {
+        match color {
+            Color::White => (self - Self::TOP_RANKS) >> 16,
+            Color::Black => (self - Self::BOTTOM_RANKS) << 16,
         }
     }
 
     // TODO: Heavy doubt, but maybe just a match would be faster? This should be tested
-    pub fn move_one_left(self, orientation: Orientation) -> Self {
-        self.move_one_right(!orientation)
+    pub fn move_one_down(self, color: Color) -> Self {
+        self.move_one_up(!color)
     }
 
-    pub fn move_one_up_right(self, orientation: Orientation) -> Self {
-        self.move_one_up(orientation).move_one_right(orientation)
+    pub fn move_one_right(self, color: Color) -> Self {
+        match color {
+            Color::White => (self - Self::H_FILE) >> 1,
+            Color::Black => (self - Self::A_FILE) << 1,
+        }
     }
 
-    pub fn move_one_up_left(self, orientation: Orientation) -> Self {
-        self.move_one_up(orientation).move_one_left(orientation)
+    // TODO: Heavy doubt, but maybe just a match would be faster? This should be tested
+    pub fn move_one_left(self, color: Color) -> Self {
+        self.move_one_right(!color)
     }
 
-    pub fn move_one_down_left(self, orientation: Orientation) -> Self {
-        self.move_one_down(orientation).move_one_left(orientation)
+    pub fn move_one_up_right(self, color: Color) -> Self {
+        self.move_one_up(color).move_one_right(color)
     }
 
-    pub fn move_one_down_right(self, orientation: Orientation) -> Self {
-        self.move_one_down(orientation).move_one_right(orientation)
+    pub fn move_one_up_left(self, color: Color) -> Self {
+        self.move_one_up(color).move_one_left(color)
+    }
+
+    pub fn move_one_down_left(self, color: Color) -> Self {
+        self.move_one_down(color).move_one_left(color)
+    }
+
+    pub fn move_one_down_right(self, color: Color) -> Self {
+        self.move_one_down(color).move_one_right(color)
     }
 
     pub fn count_ones(&self) -> u32 {
@@ -358,8 +385,8 @@ impl BitBoard {
 
     In other words, we need the "or" function.
     */
-    pub fn smear_ones_up(self, orientation: Orientation) -> Self {
-        self.move_one_up(orientation) + self
+    pub fn smear_ones_up(self, color: Color) -> Self {
+        self.move_one_up(color) + self
     }
 }
 

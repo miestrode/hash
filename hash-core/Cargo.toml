@@ -1,5 +1,5 @@
 [package]
-name = "hash"
+name = "hash-core"
 version = "0.1.0"
 edition = "2021"
 
@@ -17,8 +17,9 @@ name = "fen"
 harness = false
 
 [build-dependencies]
-hash-build = {path = "../hash-build"}
+hash-build = { path = "../hash-build" }
+rand = "0.8.5"
 
 [dependencies]
 arrayvec = "0.7.2"
-hash-build = {path = "../hash-build"}
+hash-build = { path = "../hash-build" }
