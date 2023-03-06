@@ -67,7 +67,7 @@ impl Iterator for BitIter {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     White,
     Black,

@@ -22,4 +22,5 @@ rand = "0.8.5"
 
 [dependencies]
 arrayvec = "0.7.2"
+growable-bloom-filter = "2.0.1"
 hash-build = { path = "../hash-build" }

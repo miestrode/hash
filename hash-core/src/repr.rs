@@ -146,7 +146,7 @@ impl Display for Move {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Pins {
     pub horizontal: BitBoard,
     pub vertical: BitBoard,
@@ -189,7 +189,7 @@ impl Pins {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct CastlingRights(pub [bool; 64]);
 
 impl CastlingRights {
@@ -215,7 +215,7 @@ impl CastlingRights {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Player {
     pub king: BitBoard,
     pub queens: BitBoard,
@@ -279,13 +279,13 @@ impl Player {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct EpData {
     pub capture_point: BitBoard,
     pub pawn: Square,
 }
 
-#[derive(Clone, Copy, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PieceTable(pub [Option<PieceKind>; 64]);
 
 impl PieceTable {

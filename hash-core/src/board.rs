@@ -1,14 +1,17 @@
-use std::mem;
+use std::{
+    hash::{Hash, Hasher},
+    mem,
+};
 
 use hash_build::{BitBoard, Color, Square};
 
 use crate::{
-    index::{self, zobrist_piece, zobrist_side, zobrist_castling_rights},
+    index::{self, zobrist_castling_rights, zobrist_piece, zobrist_side},
     mg,
     repr::{EpData, Move, MoveMeta, Piece, PieceKind, PieceTable, Pins, Player},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq)]
 pub struct Board {
     pub current_player: Player,
     pub opposing_player: Player,
@@ -16,6 +19,22 @@ pub struct Board {
     pub piece_table: PieceTable,
     pub ep_data: Option<EpData>,
     pub hash: u64,
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.current_player == other.current_player
+            && self.opposing_player == other.opposing_player
+            && self.current_color == other.current_color
+            && self.piece_table == other.piece_table
+            && self.ep_data == other.ep_data
+    }
+}
+
+impl Hash for Board {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(&self.hash.to_le_bytes());
+    }
 }
 
 impl Board {
@@ -85,8 +104,7 @@ impl Board {
                 self.current_color
             } else {
                 !self.current_color
-            }
-            .into(),
+            },
         })
     }
 
@@ -215,7 +233,8 @@ impl Board {
         self.ep_data = None;
 
         // Remove the previous castling rights, "stored" in the hash
-        self.hash ^= zobrist_castling_rights(&self.current_player.castling_rights) ^ zobrist_castling_rights(&self.opposing_player.castling_rights);
+        self.hash ^= zobrist_castling_rights(&self.current_player.castling_rights)
+            ^ zobrist_castling_rights(&self.opposing_player.castling_rights);
 
         // This only actually affects things if the piece moved captured a castling piece or was a
         // castling piece
@@ -223,8 +242,9 @@ impl Board {
         self.opposing_player.castling_rights.0[chess_move.target] = false;
 
         // Add the new castling rights
-        self.hash ^= zobrist_castling_rights(&self.current_player.castling_rights) ^ zobrist_castling_rights(&self.opposing_player.castling_rights);
-        
+        self.hash ^= zobrist_castling_rights(&self.current_player.castling_rights)
+            ^ zobrist_castling_rights(&self.opposing_player.castling_rights);
+
         let is_capture = self.piece_table.0[chess_move.target].is_some();
         let is_pawn_move = chess_move.moved_kind == PieceKind::Pawn;
 

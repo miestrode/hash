@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt::{self, Display},
     str::FromStr,
 };
@@ -10,6 +11,7 @@ use crate::{
     repr::{ColoredPieceTable, EpData, Move, Piece, Player},
 };
 
+use growable_bloom_filter::GrowableBloom;
 use hash_build::{Color, Square};
 
 pub enum Outcome {
@@ -31,6 +33,9 @@ impl Outcome {
 pub struct Game {
     pub board: Board,
     pub half_moves: u16, // This is the number of half moves since the last capture or pawn move
+    pub repetition_filter: GrowableBloom, // Used to avoid expensive HashSet membership checks. The
+    // vast majority of positions haven't occured before
+    pub repetition_table: HashMap<Board, u8>,
 }
 
 impl FromStr for Game {
@@ -43,8 +48,7 @@ impl FromStr for Game {
             Err("Input must contain 6 parts separated by spaces")
         } else {
             let colored_piece_table = ColoredPieceTable::from_str(parts[0])?;
-            let color = Color::from_str(parts[1])?;
-            let current_color = color.into();
+            let current_color = Color::from_str(parts[1])?;
 
             let ep_data = match parts[3] {
                 "-" => None,
@@ -87,7 +91,7 @@ impl FromStr for Game {
             }
 
             if white.king.is_empty() || black.king.is_empty() {
-                return Err("Input is illegal as a FEN-string must include both players' kings")
+                return Err("Input is illegal as a FEN-string must include both players' kings");
             }
 
             if parts[2] != "-" {
@@ -109,7 +113,7 @@ impl FromStr for Game {
             white.castling_rights.0[Square::E1] = true;
             black.castling_rights.0[Square::E8] = true;
 
-            let (current_player, opposing_player) = match color {
+            let (current_player, opposing_player) = match current_color {
                 Color::White => (white, black),
                 Color::Black => (black, white),
             };
@@ -121,14 +125,21 @@ impl FromStr for Game {
                 piece_table: colored_piece_table.uncolored(),
                 ep_data,
                 // the FEN-string is assumed to be valid
-                hash: unsafe {zobrist_piece_table(&colored_piece_table)}
-                    ^ zobrist_side(color)
+                hash: unsafe { zobrist_piece_table(&colored_piece_table) }
+                    ^ zobrist_side(current_color)
                     ^ ep_data.map_or(0, |ep_data| zobrist_ep_file(ep_data.pawn.file()))
                     ^ zobrist_castling_rights(&white.castling_rights)
                     ^ zobrist_castling_rights(&black.castling_rights),
             };
 
-            let mut game = Self { board, half_moves };
+            let mut game = Self {
+                board,
+                half_moves,
+                // TODO: Experiment with differing values find the optimal values
+                // for these assignments
+                repetition_filter: GrowableBloom::new(0.05, 100),
+                repetition_table: HashMap::with_capacity(100),
+            };
 
             game.board.update_move_constraints();
 
@@ -172,7 +183,7 @@ impl Display for Game {
 
         ' '.fmt(f)?;
 
-        Color::from(self.board.current_color).fmt(f)?;
+        self.board.current_color.fmt(f)?;
 
         ' '.fmt(f)?;
 
@@ -283,7 +294,7 @@ impl Game {
     // (although in practice, it is autoclaimed by the GUI. Despite that, mate-in-one issues strip
     // of them right to be here)
     pub fn game_outcome(&self) -> Option<Outcome> {
-        if mg::gen_moves(&self.board).len() == 0 {
+        if mg::gen_moves(&self.board).is_empty() {
             // If a player is in check, he is attacked and so this is mate. The player who is
             // moving thus lost
             if self.board.current_player.is_in_check() {
@@ -300,9 +311,14 @@ impl Game {
         }
     }
 
+    pub fn was_repeated_thrice(&self, board: &Board) -> bool {
+        self.repetition_filter.contains(board)
+            && matches!(self.repetition_table.get_key_value(board), Some((_, 3)))
+    }
+
     // Can either player claim a draw in this position?
     pub fn can_claim_draw(&self) -> bool {
         // Credible source: https://www.chessprogramming.org/Fifty-move_Rule
-        self.half_moves >= 100 && todo!("Add repetition support")
+        self.half_moves >= 100 && self.was_repeated_thrice(&self.board)
     }
 }
