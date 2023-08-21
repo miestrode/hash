@@ -1,8 +1,7 @@
-#![feature(const_trait_impl)]
 use std::{env, fmt::Debug, fs, io::Error, path::PathBuf};
 
-use hash_build::{BitBoard, Square, ZobristMap, Color};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use hash_build::{bb, BitBoard, Color, Square, ZobristMap};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 // Used for updating the structure based on build flags.
 #[derive(Clone, Copy, Debug)]
@@ -15,7 +14,16 @@ pub struct Metadata {
 
 // All of the edges of the board. Useful for slide generation, since they represent areas that will
 // be reached no matter if they are blocked by pieces, since blockers can be eaten
-const EDGES: BitBoard = BitBoard::EDGE_FILES + BitBoard::EDGE_RANKS;
+const EDGES: BitBoard = bb!(
+    0b11111111
+    0b10000001
+    0b10000001
+    0b10000001
+    0b10000001
+    0b10000001
+    0b10000001
+    0b11111111
+);
 
 // PERF: This is very slow, especially when used to spew out multiple rays, however, it doesn't
 // matter since this isn't used to actually generate rays during runtime
@@ -116,11 +124,8 @@ pub fn gen_knight_index(piece: BitBoard) -> BitBoard {
 }
 
 pub fn gen_king_index(piece: BitBoard) -> BitBoard {
-    let line = piece.move_one_left(Color::White)
-        + piece
-        + piece.move_one_right(Color::White);
-    line.move_one_up(Color::White) + line + line.move_one_down(Color::White)
-        - piece
+    let line = piece.move_one_left(Color::White) + piece + piece.move_one_right(Color::White);
+    line.move_one_up(Color::White) + line + line.move_one_down(Color::White) - piece
 }
 
 pub fn gen_cross_mask(piece: BitBoard) -> BitBoard {

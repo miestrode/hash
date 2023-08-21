@@ -3,9 +3,7 @@ use std::{
     str::FromStr,
 };
 
-use hash_build::Color;
-
-use crate::{BitBoard, Square};
+use crate::{BitBoard, Color, Square};
 
 #[derive(Eq, Hash, Debug, Clone, Copy, PartialEq)]
 pub enum PieceKind {
@@ -130,7 +128,7 @@ pub enum MoveMeta {
 pub struct Move {
     pub origin: Square,
     pub target: Square,
-    pub moved_kind: PieceKind,
+    pub moved_piece_kind: PieceKind,
     pub meta: MoveMeta,
 }
 
@@ -146,7 +144,7 @@ impl Display for Move {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Pins {
     pub horizontal: BitBoard,
     pub vertical: BitBoard,
@@ -189,7 +187,7 @@ impl Pins {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CastlingRights(pub [bool; 64]);
 
 impl CastlingRights {
@@ -215,7 +213,7 @@ impl CastlingRights {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Player {
     pub king: BitBoard,
     pub queens: BitBoard,
@@ -279,7 +277,7 @@ impl Player {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EpData {
     pub capture_point: BitBoard,
     pub pawn: Square,
@@ -291,14 +289,14 @@ pub struct PieceTable(pub [Option<PieceKind>; 64]);
 impl PieceTable {
     pub fn move_piece(&mut self, origin: Square, target: Square) {
         self.0.swap(origin.as_index(), target.as_index());
-        self.set(origin, None);
+        self.set(None, origin);
     }
 
     pub fn piece_kind(&self, square: Square) -> Option<PieceKind> {
         self.0[square]
     }
 
-    pub fn set(&mut self, square: Square, kind: Option<PieceKind>) {
+    pub fn set(&mut self, kind: Option<PieceKind>, square: Square) {
         self.0[square] = kind;
     }
 }

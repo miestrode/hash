@@ -5,10 +5,10 @@ use hash_core::game::Game;
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("perft default 3", |b| {
-        b.iter(|| black_box(Game::default()).perft(3))
+        b.iter(|| black_box(Game::default()).board.perft(3))
     });
     c.bench_function("perft default 5", |b| {
-        b.iter(|| black_box(Game::default()).perft(5))
+        b.iter(|| black_box(Game::default()).board.perft(5))
     });
     c.bench_function("perft kiwipete 3", |b| {
         b.iter(|| {
@@ -17,7 +17,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
                 )
                 .unwrap(),
-            )
+            ).board
             .perft(3)
         })
     });
@@ -28,7 +28,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
                 )
                 .unwrap(),
-            )
+            ).board
             .perft(4)
         })
     });

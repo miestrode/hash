@@ -156,6 +156,7 @@ impl Square {
         BitBoard(1 << self.0)
     }
 
+    // SAFETY: Square is assumed to be legal
     pub unsafe fn move_one_down_unchecked(&self, color: Color) -> Self {
         match color {
             Color::White => Self(self.0 - 8),
@@ -163,6 +164,7 @@ impl Square {
         }
     }
 
+    // SAFETY: Square is assumed to be legal
     pub unsafe fn move_two_down_unchecked(&self, color: Color) -> Self {
         match color {
             Color::White => Self(self.0 - 16),
@@ -170,6 +172,7 @@ impl Square {
         }
     }
 
+    // SAFETY: Square is assumed to be legal
     pub unsafe fn move_one_down_left_unchecked(&self, color: Color) -> Self {
         match color {
             Color::White => Self(self.0 - 9),
@@ -177,6 +180,7 @@ impl Square {
         }
     }
 
+    // SAFETY: Square is assumed to be legal
     pub unsafe fn move_one_down_right_unchecked(&self, color: Color) -> Self {
         match color {
             Color::White => Self(self.0 - 7),
@@ -184,11 +188,17 @@ impl Square {
         }
     }
 
+    // SAFETY: Square is assumed to be legal
     pub unsafe fn move_one_up_unchecked(&self, color: Color) -> Self {
         match color {
             Color::White => Self(self.0 + 8),
             Color::Black => Self(self.0 - 8),
         }
+    }
+
+    // SAFETY: Square is assumed to be legal
+    pub unsafe fn move_horizontally(&self, steps: i32) -> Self {
+        Self((self.0 as i32 - steps) as u32)
     }
 
     pub fn rank(&self) -> u32 {

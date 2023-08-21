@@ -7,7 +7,8 @@ use crate::{
     repr::{EpData, Move, MoveMeta, PieceKind},
 };
 
-type Moves = ArrayVec<Move, 256>;
+pub const MOVES: usize = 218;
+type Moves = ArrayVec<Move, MOVES>;
 
 pub trait Gen {
     fn dangers(pieces: BitBoard, occupation: BitBoard, color: Color, dangers: &mut BitBoard);
@@ -47,7 +48,7 @@ impl Pawn {
                     origin,
                     target,
                     meta: MoveMeta::Promotion(piece),
-                    moved_kind: PieceKind::Pawn,
+                    moved_piece_kind: PieceKind::Pawn,
                 }
             }));
         } else {
@@ -55,7 +56,7 @@ impl Pawn {
                 // SAFETY: Reversing the movement always returns a valid pawn square, by definition
                 origin,
                 target,
-                moved_kind: PieceKind::Pawn,
+                moved_piece_kind: PieceKind::Pawn,
                 meta: MoveMeta::None,
             })
         }
@@ -102,7 +103,7 @@ impl Gen for Pawn {
                 // SAFETY: See above
                 origin: unsafe { target.move_two_down_unchecked(board.current_color) },
                 target,
-                moved_kind: PieceKind::Pawn,
+                moved_piece_kind: PieceKind::Pawn,
                 meta: MoveMeta::DoublePush,
             }));
         }
@@ -168,7 +169,7 @@ impl Gen for Pawn {
                     {
                         moves.push(Move {
                             origin: capturer.first_one_as_square(),
-                            moved_kind: PieceKind::Pawn,
+                            moved_piece_kind: PieceKind::Pawn,
                             target: capture_point.first_one_as_square(),
                             meta: MoveMeta::EnPassant,
                         });
@@ -190,7 +191,7 @@ impl Gen for Pawn {
                     {
                         moves.push(Move {
                             origin: capturer.first_one_as_square(),
-                            moved_kind: PieceKind::Pawn,
+                            moved_piece_kind: PieceKind::Pawn,
                             target: capture_point.first_one_as_square(),
                             meta: MoveMeta::EnPassant,
                         });
@@ -218,7 +219,7 @@ impl Gen for Knight {
             moves.extend(attacks.bits().map(|target| Move {
                 origin: piece,
                 target,
-                moved_kind: PieceKind::Knight,
+                moved_piece_kind: PieceKind::Knight,
                 meta: MoveMeta::None,
             }))
         }
@@ -249,7 +250,7 @@ impl Gen for Bishop {
                         origin: bishop,
                         target,
                         meta: MoveMeta::None,
-                        moved_kind: PieceKind::Bishop,
+                        moved_piece_kind: PieceKind::Bishop,
                     }),
             );
         }
@@ -265,7 +266,7 @@ impl Gen for Bishop {
                         origin: bishop,
                         target,
                         meta: MoveMeta::None,
-                        moved_kind: PieceKind::Bishop,
+                        moved_piece_kind: PieceKind::Bishop,
                     }),
             );
         }
@@ -294,7 +295,7 @@ impl Gen for Rook {
                         origin: rook,
                         target,
                         meta: MoveMeta::None,
-                        moved_kind: PieceKind::Rook,
+                        moved_piece_kind: PieceKind::Rook,
                     }),
             );
         }
@@ -309,7 +310,7 @@ impl Gen for Rook {
                         origin: rook,
                         target,
                         meta: MoveMeta::None,
-                        moved_kind: PieceKind::Rook,
+                        moved_piece_kind: PieceKind::Rook,
                     }),
             );
         }
@@ -338,7 +339,7 @@ impl Gen for Queen {
                     origin: queen,
                     target,
                     meta: MoveMeta::None,
-                    moved_kind: PieceKind::Queen,
+                    moved_piece_kind: PieceKind::Queen,
                 }),
             );
         }
@@ -354,7 +355,7 @@ impl Gen for Queen {
                     origin: queen,
                     target,
                     meta: MoveMeta::None,
-                    moved_kind: PieceKind::Queen,
+                    moved_piece_kind: PieceKind::Queen,
                 }),
             );
         }
@@ -370,7 +371,7 @@ impl Gen for Queen {
                         origin: queen,
                         target,
                         meta: MoveMeta::None,
-                        moved_kind: PieceKind::Queen,
+                        moved_piece_kind: PieceKind::Queen,
                     }),
             );
         }
@@ -397,7 +398,7 @@ impl Gen for King {
                         origin,
                         target,
                         meta: MoveMeta::None,
-                        moved_kind: PieceKind::King,
+                        moved_piece_kind: PieceKind::King,
                     }),
             );
         }
@@ -415,7 +416,7 @@ impl Gen for King {
                         Color::White => Square::G1,
                         Color::Black => Square::G8,
                     },
-                    moved_kind: PieceKind::King,
+                    moved_piece_kind: PieceKind::King,
                     meta: MoveMeta::CastleKs,
                 });
             }
@@ -431,7 +432,7 @@ impl Gen for King {
                         Color::White => Square::C1,
                         Color::Black => Square::C8,
                     },
-                    moved_kind: PieceKind::King,
+                    moved_piece_kind: PieceKind::King,
                     meta: MoveMeta::CastleQs,
                 });
             }

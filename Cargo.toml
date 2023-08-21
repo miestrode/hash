@@ -1,6 +1,6 @@
 [profile.release]
-debug = true
+codegen-units = 1
 lto = true
 
 [workspace]
-members = ["hash-build", "hash-core", "hash-eval", "hash-search"]
+members = ["hash-build", "hash-core", "hash-eval", "hash-search", "hash-cli"]

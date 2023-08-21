@@ -1,9 +1,11 @@
 [package]
-name = "hash-search"
+name = "hash-cli"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hash-core = { path = "../hash-core/" }
+hash-eval = { path = "../hash-eval" }
+hash-core = { path = "../hash-core" }
+hash-search = { path = "../hash-search" }

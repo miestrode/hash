@@ -67,10 +67,26 @@ impl Iterator for BitIter {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Color {
     White,
     Black,
+}
+
+impl Color {
+    pub fn as_f32_sign(&self) -> f32 {
+        match self {
+            Color::White => 1.0,
+            Color::Black => -1.0,
+        }
+    }
+
+    pub fn as_sign(&self) -> i32 {
+        match self {
+            Color::White => 1,
+            Color::Black => -1,
+        }
+    }
 }
 
 impl Not for Color {
@@ -113,7 +129,7 @@ impl Display for Color {
 impl BitBoard {
     pub const EMPTY: Self = Self(0);
 
-    pub const FULL: Self = !Self::EMPTY;
+    pub const FULL: Self = Self(u64::MAX);
 
     pub const A_FILE: Self = bb!(
         0b10000000
@@ -137,7 +153,16 @@ impl BitBoard {
         0b00000001
     );
 
-    pub const EDGE_FILES: Self = Self::A_FILE + Self::H_FILE;
+    pub const EDGE_FILES: Self = bb!(
+        0b10000001
+        0b10000001
+        0b10000001
+        0b10000001
+        0b10000001
+        0b10000001
+        0b10000001
+        0b10000001
+    );
 
     pub const RANK_1: Self = bb!(
         0b00000000
@@ -161,9 +186,27 @@ impl BitBoard {
         0b00000000
     );
 
-    pub const BOTTOM_RANKS: Self = Self::RANK_1 + Self::RANK_2;
+    pub const BOTTOM_RANKS: Self = bb!(
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b11111111
+        0b11111111
+    );
 
-    pub const TOP_RANKS: Self = Self::RANK_7 + Self::RANK_8;
+    pub const TOP_RANKS: Self = bb!(
+        0b11111111
+        0b11111111
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+    );
 
     pub const RANK_8: Self = bb!(
         0b11111111
@@ -230,9 +273,27 @@ impl BitBoard {
 
     pub const TOP_QS_DANGER_SPACE: Self = Self::BOTTOM_QS_DANGER_SPACE.v_flip();
 
-    pub const EDGE_RANKS: Self = Self::RANK_1 + Self::RANK_8;
+    pub const EDGE_RANKS: Self = bb!(
+        0b11111111
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b11111111
+    );
 
-    pub const PAWN_START_RANKS: Self = Self::RANK_2 + Self::RANK_7;
+    pub const PAWN_START_RANKS: Self = bb!(
+        0b00000000
+        0b11111111
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b11111111
+        0b00000000
+    );
 
     pub fn ks_space(color: Color) -> Self {
         match color {
@@ -400,7 +461,7 @@ impl IntoIterator for BitBoard {
     }
 }
 
-impl const Not for BitBoard {
+impl Not for BitBoard {
     type Output = Self;
 
     fn not(self) -> Self::Output {
@@ -426,7 +487,7 @@ impl Sub for BitBoard {
 }
 
 #[allow(clippy::suspicious_arithmetic_impl)]
-impl const Add for BitBoard {
+impl Add for BitBoard {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {

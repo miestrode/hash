@@ -80,7 +80,7 @@ pub fn separated_bishop_slides(
 pub fn rook_slides(piece: Square, blockers: BitBoard) -> BitBoard {
     let metadata = CROSS_META[piece];
     unsafe {
-        SLIDES.get_unchecked(
+        *SLIDES.get_unchecked(
             metadata.offset
                 + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 12)) as usize,
         )
@@ -91,7 +91,7 @@ pub fn rook_slides(piece: Square, blockers: BitBoard) -> BitBoard {
 pub fn bishop_slides(piece: Square, blockers: BitBoard) -> BitBoard {
     let metadata = DIAGONAL_META[piece];
     unsafe {
-        SLIDES.get_unchecked(
+        *SLIDES.get_unchecked(
             metadata.offset
                 + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 9)) as usize,
         )
@@ -105,7 +105,7 @@ pub fn separated_rook_slides(
 ) -> (BitBoard, BitBoard, BitBoard, BitBoard) {
     let metadata = CROSS_META[piece];
     unsafe {
-        SEPARATED_SLIDES.get_unchecked(
+        *SEPARATED_SLIDES.get_unchecked(
             metadata.offset
                 + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 12)) as usize,
         )
@@ -119,7 +119,7 @@ pub fn separated_bishop_slides(
 ) -> (BitBoard, BitBoard, BitBoard, BitBoard) {
     let metadata = DIAGONAL_META[piece];
     unsafe {
-        SEPARATED_SLIDES.get_unchecked(
+        *SEPARATED_SLIDES.get_unchecked(
             metadata.offset
                 + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 9)) as usize,
         )
@@ -158,7 +158,7 @@ pub fn zobrist_piece(piece: Piece, square: Square) -> u64 {
         PieceKind::Knight => ZOBRIST_MAP.pieces.knight,
         PieceKind::Pawn => ZOBRIST_MAP.pieces.pawn,
     })[square]
-        * zobrist_side(piece.color)
+        .wrapping_mul(zobrist_side(piece.color))
 }
 
 // SAFETY: This function assumes the piece table comes from a valid board

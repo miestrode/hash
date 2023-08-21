@@ -1,0 +1,1 @@
+rustflags = ["-C link-args=-Wl,-zstack-size=1048576"]

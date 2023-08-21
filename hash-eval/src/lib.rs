@@ -1,21 +1,24 @@
 use hash_core::{board::Board, repr::Player, Color};
-use hash_search::Eval;
+use hash_search::{score::Score, Eval};
 
-fn material(player: Player) -> u32 {
-    player.queens.count_ones() * 9
+// An i32 is used here since we are, during evaluation, subtracting material
+fn material(player: Player) -> i16 {
+    (player.queens.count_ones() * 9
         + player.rooks.count_ones() * 5
         + player.bishops.count_ones() * 3
         + player.knights.count_ones() * 3
-        + player.pawns.count_ones()
+        + player.pawns.count_ones()) as i16
 }
 
-struct Evaluator;
+pub struct BasicEvaluator;
 
-impl Eval for Evaluator {
-    fn eval(&self, board: Board) -> f32 {
-        (match board.current_color {
-            Color::White => 1.0,
-            Color::Black => -1.0,
-        }) * (material(board.current_player) - material(board.opposing_player)) as f32
+impl Eval for BasicEvaluator {
+    fn eval(&self, board: &Board) -> Score {
+        Score::from_evaluation(
+            (match board.current_color {
+                Color::White => 1,
+                Color::Black => -1,
+            }) * (material(board.current_player) - material(board.opposing_player)),
+        )
     }
 }
