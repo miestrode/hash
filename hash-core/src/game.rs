@@ -29,12 +29,6 @@ pub struct Game {
     repetition_cache: Cache<u8, CACHE_LENGTH>,
 }
 
-impl PartialEq for Game {
-    fn eq(&self, other: &Self) -> bool {
-        self.board == other.board && self.half_moves == other.half_moves
-    }
-}
-
 impl FromStr for Game {
     type Err = &'static str;
 

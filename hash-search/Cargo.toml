@@ -1,5 +1,6 @@
 [package]
 name = "hash-search"
+description = "Chess position search system for game evaluation, part of the Hash Chess Engine"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,3 +8,4 @@ edition = "2021"
 
 [dependencies]
 hash-core = { path = "../hash-core/" }
+rayon = "1.7.0"

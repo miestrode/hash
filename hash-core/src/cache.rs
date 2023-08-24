@@ -3,7 +3,7 @@ pub trait CacheHash {
 }
 
 #[derive(Clone, Copy)]
-pub struct Entry<T: Copy> {
+struct Entry<T: Copy> {
     value: T,
     hash: u64,
 }
@@ -17,7 +17,7 @@ impl<T: Copy, const N: usize> Cache<T, N> {
     // TODO: Rework this implementation to be less simple. The replacement strategy shown here
     // should be tweaked to be more balanced, and of course, fixed-probing should be explored
     // (probing up to some number H of buckets, and then simply replacing)
-    pub fn insert<K: CacheHash>(&mut self, key: K, value: T) {
+    pub fn insert<K: CacheHash>(&mut self, key: &K, value: T) {
         let hash = key.hash();
 
         self.data[hash as usize % N] = Some(Entry { value, hash });

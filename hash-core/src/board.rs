@@ -9,7 +9,7 @@ use crate::{
     repr::{EpData, Move, MoveMeta, Piece, PieceKind, PieceTable, Pins, Player},
 };
 
-#[derive(Clone, Copy, Eq)]
+#[derive(Clone, Copy)]
 pub struct Board {
     pub current_player: Player,
     pub opposing_player: Player,
@@ -17,14 +17,6 @@ pub struct Board {
     pub piece_table: PieceTable,
     pub ep_data: Option<EpData>,
     pub hash: u64,
-}
-
-impl PartialEq for Board {
-    fn eq(&self, other: &Self) -> bool {
-        self.current_color == other.current_color
-            && self.piece_table == other.piece_table
-            && self.ep_data == other.ep_data
-    }
 }
 
 impl CacheHash for Board {
