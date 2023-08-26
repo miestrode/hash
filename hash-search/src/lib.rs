@@ -1,4 +1,4 @@
-use hash_core::{board::Board, game::Game, repr::Move};
+use hash_core::{board::Board, game::Game, mg, repr::Move};
 use score::Score;
 
 pub mod score;
@@ -10,17 +10,18 @@ pub trait Eval {
 }
 
 // TODO: Make search interruptible
-pub fn search<E: Eval + Sync>(game: &Game, evaluator: &E, depth: i16) -> Option<(Move, Score)> {
+pub fn search<E: Eval + Sync>(game: &mut Game, evaluator: &E, depth: i16) -> Option<(Move, Score)> {
     let table = tt::ConcreteTable::new();
 
     if game.outcome().is_none() {
-        game.following_games()
+        mg::gen_moves(&game.board)
             .into_iter()
-            .map(|(chess_move, game)| {
-                (
+            .map(|chess_move| {
+                unsafe { game.make_move_unchecked(&chess_move) };
+                let result = (
                     chess_move,
                     search::negamax(
-                        &game,
+                        game,
                         evaluator,
                         &table,
                         depth - 1,
@@ -29,7 +30,10 @@ pub fn search<E: Eval + Sync>(game: &Game, evaluator: &E, depth: i16) -> Option<
                         Score::BEST,
                     )
                     .flip(),
-                )
+                );
+                game.unmake_last_move();
+
+                result
             })
             .max_by_key(|(_, evaluation)| *evaluation)
     } else {

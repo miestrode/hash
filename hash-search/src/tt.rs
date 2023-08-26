@@ -83,13 +83,13 @@ impl<const N: usize> Table<N> {
     // should be tweaked to be more balanced, and of course, fixed-probing should be explored
     // (probing up to some number H of buckets, and then simply replacing)
     pub fn insert(&self, key: &Board, evaluation: Score, depth: i16, metadata: EntryMetadata) {
-        let hash = key.calculate_hash();
+        let hash = key.hash();
 
         self.data[hash as usize % N].update(hash, evaluation, depth, metadata)
     }
 
     pub fn get(&self, key: &Board) -> Option<Entry> {
-        let hash = key.calculate_hash();
+        let hash = key.hash();
         let entry = self.data[hash as usize % self.data.len()].to_entry();
 
         if entry.hash == hash {

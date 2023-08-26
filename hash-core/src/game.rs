@@ -1,5 +1,6 @@
 use std::{
     fmt::{self, Display},
+    mem,
     str::FromStr,
 };
 
@@ -7,12 +8,11 @@ use crate::{
     board::Board,
     cache::Cache,
     index::{zobrist_castling_rights, zobrist_ep_file, zobrist_piece_table, zobrist_side},
-    mg::{self, MOVES},
-    repr::{ColoredPieceTable, EpData, Move, Piece, Player},
+    mg::{self},
+    repr::{ColoredPieceTable, EpData, Move, MoveMeta, Piece, PieceKind, Pins, Player},
 };
 
-use arrayvec::ArrayVec;
-use hash_build::{Color, Square};
+use hash_build::{BitBoard, Color, Square};
 
 pub enum Outcome {
     BlackWin,
@@ -20,13 +20,28 @@ pub enum Outcome {
     Draw,
 }
 
-const CACHE_LENGTH: usize = 200;
+struct RestorationData {
+    current_origin_castling_right: bool,
+    opposing_target_castling_right: bool,
+    opposing_king_must_move: bool,
+    opposing_pins: Pins,
+    opposing_valid_targets: BitBoard,
+    captured_piece_kind: Option<PieceKind>,
+    ep_data: Option<EpData>,
+    board_hash: u64,
+    applied_move: Move,
+    half_moves: u16, // This is the number of half moves since the last capture or pawn move
+}
 
-#[derive(Clone, Copy)]
+const CACHE_LENGTH: usize = 1000;
+const RESTORATION_DATA_START_CAPACITY: usize = 8;
+
 pub struct Game {
     pub board: Board,
     half_moves: u16, // This is the number of half moves since the last capture or pawn move
     repetition_cache: Cache<u8, CACHE_LENGTH>,
+    // TODO: Consider using an array here:
+    restoration_data: Vec<RestorationData>,
 }
 
 impl FromStr for Game {
@@ -129,6 +144,7 @@ impl FromStr for Game {
                 // TODO: Experiment with differing values find the optimal values
                 // for this assignment
                 repetition_cache: Cache::new(),
+                restoration_data: Vec::with_capacity(RESTORATION_DATA_START_CAPACITY),
             };
 
             game.board.update_move_constraints();
@@ -229,24 +245,155 @@ impl Default for Game {
 impl Game {
     // SAFETY: The move is assumed to be legal
     pub unsafe fn make_move_unchecked(&mut self, chess_move: &Move) {
+        self.restoration_data.push(RestorationData {
+            current_origin_castling_right: self.board.current_player.castling_rights.0
+                [chess_move.origin],
+            opposing_target_castling_right: self.board.opposing_player.castling_rights.0
+                [chess_move.target],
+            opposing_king_must_move: self.board.opposing_player.king_must_move,
+            opposing_pins: self.board.opposing_player.pins,
+            opposing_valid_targets: self.board.opposing_player.valid_targets,
+            // If the move is an en-passant, this isn't used, and so this need not be fully
+            // accurate.
+            captured_piece_kind: self.board.piece_table.piece_kind(chess_move.target),
+            ep_data: self.board.ep_data,
+            board_hash: self.board.hash,
+            applied_move: *chess_move,
+            half_moves: self.half_moves,
+        });
+
+        let previous_value = self.repetition_cache.get(&self.board).unwrap_or(0);
+        self.repetition_cache
+            .insert(&self.board, previous_value + 1);
+
         if unsafe { self.board.make_move_unchecked(chess_move) } {
             self.half_moves += 1;
         }
     }
 
-    pub fn following_games(&self) -> ArrayVec<(Move, Game), MOVES> {
-        mg::gen_moves(&self.board)
-            .into_iter()
-            .map(|chess_move| {
-                let mut game = *self;
+    /// Undo the last move on this game. If there was no move to undo, `false` is returned and
+    /// otherwise `true` is.
+    pub fn unmake_last_move(&mut self) -> bool {
+        if let Some(restoration_data) = self.restoration_data.pop() {
+            self.half_moves = restoration_data.half_moves;
+            self.board.hash = restoration_data.board_hash;
 
+            self.board.piece_table.move_piece(
+                restoration_data.applied_move.target,
+                restoration_data.applied_move.origin,
+            );
+            self.board.current_color = !self.board.current_color;
+            mem::swap(
+                &mut self.board.current_player,
+                &mut self.board.opposing_player,
+            );
+            self.board.ep_data = restoration_data.ep_data;
+
+            if let MoveMeta::Promotion(piece_kind) = restoration_data.applied_move.meta {
+                self.board.current_player.toggle_piece(
+                    restoration_data.applied_move.moved_piece_kind,
+                    restoration_data.applied_move.origin,
+                );
+                self.board
+                    .current_player
+                    .toggle_piece(piece_kind, restoration_data.applied_move.target);
+            } else {
                 unsafe {
-                    game.make_move_unchecked(&chess_move);
-                }
+                    self.board.current_player.move_piece_unchecked(
+                        restoration_data.applied_move.moved_piece_kind,
+                        restoration_data.applied_move.target,
+                        restoration_data.applied_move.origin,
+                    )
+                };
+            }
 
-                (chess_move, game)
-            })
-            .collect()
+            if let MoveMeta::EnPassant = restoration_data.applied_move.meta {
+                if let Some(ep_data) = restoration_data.ep_data {
+                    self.board
+                        .opposing_player
+                        .toggle_piece(PieceKind::Pawn, ep_data.pawn);
+                    self.board
+                        .piece_table
+                        .set(Some(PieceKind::Pawn), ep_data.pawn);
+                } else {
+                    unreachable!()
+                }
+            } else if let Some(piece_kind) = restoration_data.captured_piece_kind {
+                self.board
+                    .opposing_player
+                    .toggle_piece(piece_kind, restoration_data.applied_move.target);
+                self.board.piece_table.set(
+                    restoration_data.captured_piece_kind,
+                    restoration_data.applied_move.target,
+                );
+            }
+
+            self.board.current_player.castling_rights.0[restoration_data.applied_move.origin] =
+                restoration_data.current_origin_castling_right;
+            self.board.opposing_player.castling_rights.0[restoration_data.applied_move.target] =
+                restoration_data.opposing_target_castling_right;
+
+            match restoration_data.applied_move.meta {
+                MoveMeta::CastleKs => match self.board.current_color {
+                    Color::White => unsafe {
+                        self.board.current_player.move_piece_unchecked(
+                            PieceKind::Rook,
+                            Square::F1,
+                            Square::BOTTOM_RIGHT_ROOK,
+                        );
+                        self.board
+                            .piece_table
+                            .move_piece(Square::F1, Square::BOTTOM_RIGHT_ROOK);
+                    },
+                    Color::Black => unsafe {
+                        self.board.current_player.move_piece_unchecked(
+                            PieceKind::Rook,
+                            Square::F8,
+                            Square::TOP_RIGHT_ROOK,
+                        );
+                        self.board
+                            .piece_table
+                            .move_piece(Square::F8, Square::TOP_RIGHT_ROOK);
+                    },
+                },
+                MoveMeta::CastleQs => match self.board.current_color {
+                    Color::White => unsafe {
+                        self.board.current_player.move_piece_unchecked(
+                            PieceKind::Rook,
+                            Square::C1,
+                            Square::BOTTOM_LEFT_ROOK,
+                        );
+                        self.board
+                            .piece_table
+                            .move_piece(Square::C1, Square::BOTTOM_LEFT_ROOK);
+                    },
+                    Color::Black => unsafe {
+                        self.board.current_player.move_piece_unchecked(
+                            PieceKind::Rook,
+                            Square::C8,
+                            Square::TOP_LEFT_ROOK,
+                        );
+                        self.board
+                            .piece_table
+                            .move_piece(Square::C8, Square::TOP_LEFT_ROOK);
+                    },
+                },
+                _ => {}
+            }
+
+            self.board.opposing_player.king_must_move = restoration_data.opposing_king_must_move;
+            self.board.opposing_player.pins = restoration_data.opposing_pins;
+            self.board.opposing_player.valid_targets = restoration_data.opposing_valid_targets;
+
+            // TODO:: Add utility methods to the cache API, to make this code nicer
+            if let Some(value) = self.repetition_cache.get(&self.board) {
+                self.repetition_cache.insert(&self.board, value - 1);
+            }
+
+            true
+        } else {
+            false
+        }
     }
 
     // NOTE: that draw by repetition and the 50-move rule both require one to claim the draw

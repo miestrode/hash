@@ -1,5 +1,5 @@
 pub trait CacheHash {
-    fn calculate_hash(&self) -> u64;
+    fn hash(&self) -> u64;
 }
 
 #[derive(Clone)]
@@ -20,13 +20,13 @@ impl<T: Clone, const N: usize> Cache<T, N> {
     // should be tweaked to be more balanced, and of course, fixed-probing should be explored
     // (probing up to some number H of buckets, and then simply replacing)
     pub fn insert<K: CacheHash>(&mut self, key: &K, value: T) {
-        let hash = key.calculate_hash();
+        let hash = key.hash();
 
         self.data[hash as usize % N] = Some(Entry { value, hash });
     }
 
     pub fn get<K: CacheHash>(&self, key: &K) -> Option<T> {
-        let hash = key.calculate_hash();
+        let hash = key.hash();
         let entry = &self.data[hash as usize % self.data.len()];
 
         entry.as_ref().and_then(|entry| {

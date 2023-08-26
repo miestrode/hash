@@ -1,6 +1,9 @@
 use std::convert;
 
-use hash_core::game::{Game, Outcome};
+use hash_core::{
+    game::{Game, Outcome},
+    mg,
+};
 
 use crate::{
     score::Score,
@@ -9,7 +12,7 @@ use crate::{
 };
 
 pub(crate) fn negamax<E: Eval + Sync, const N: usize>(
-    game: &Game,
+    game: &mut Game,
     evaluator: &E,
     tt: &tt::Table<N>,
     depth: i16,
@@ -29,14 +32,16 @@ pub(crate) fn negamax<E: Eval + Sync, const N: usize>(
     {
         // TODO: Consider somehow utilizing the reselt of the shallower search, instead of just
         // discarding it.
-        match metadata {
-            EntryMetadata::Exact => return evaluation,
-            EntryMetadata::LowerBound => alpha = alpha.max(evaluation),
-            EntryMetadata::UpperBound => beta = beta.min(evaluation),
-        }
+        if entry_depth >= depth {
+            match metadata {
+                EntryMetadata::Exact => return evaluation,
+                EntryMetadata::LowerBound => alpha = alpha.max(evaluation),
+                EntryMetadata::UpperBound => beta = beta.min(evaluation),
+            }
 
-        if alpha >= beta {
-            return evaluation;
+            if alpha >= beta {
+                return evaluation;
+            }
         }
     }
 
@@ -48,13 +53,13 @@ pub(crate) fn negamax<E: Eval + Sync, const N: usize>(
     } else if depth == 0 {
         evaluator.eval(&game.board)
     } else {
-        let evaluation = game
-            .following_games()
+        let evaluation = mg::gen_moves(&game.board)
             .into_iter()
-            .try_fold(Score::WORST, |mut best, (_, game)| {
+            .try_fold(Score::WORST, |mut best, chess_move| {
+                unsafe { game.make_move_unchecked(&chess_move) };
                 best = best.max(
                     negamax(
-                        &game,
+                        game,
                         evaluator,
                         tt,
                         depth - 1,
@@ -64,6 +69,8 @@ pub(crate) fn negamax<E: Eval + Sync, const N: usize>(
                     )
                     .flip(),
                 );
+                game.unmake_last_move();
+
                 alpha = alpha.max(best);
 
                 if alpha >= beta {
