@@ -1,10 +1,10 @@
-use std::mem;
+use std::{mem, str::FromStr};
 
 use hash_build::{BitBoard, Color, Square};
 
 use crate::{
     cache::CacheHash,
-    index::{self, zobrist_castling_rights, zobrist_piece, zobrist_side},
+    index::{self, zobrist_castling_rights, zobrist_ep_file, zobrist_piece, zobrist_side},
     mg,
     repr::{EpData, Move, MoveMeta, Piece, PieceKind, PieceTable, Pins, Player},
 };
@@ -20,7 +20,7 @@ pub struct Board {
 }
 
 impl CacheHash for Board {
-    fn hash(&self) -> u64 {
+    fn calculate_hash(&self) -> u64 {
         self.hash
     }
 }
@@ -227,6 +227,10 @@ impl Board {
         let past_ep_data = self.ep_data;
         self.ep_data = None;
 
+        if let Some(ep_data) = past_ep_data {
+            self.hash ^= zobrist_ep_file(ep_data.pawn.file());
+        }
+
         // Remove the previous castling rights, "stored" in the hash
         self.hash ^= zobrist_castling_rights(&self.current_player.castling_rights)
             ^ zobrist_castling_rights(&self.opposing_player.castling_rights);
@@ -293,6 +297,8 @@ impl Board {
                 );
             }
             MoveMeta::DoublePush => {
+                self.hash ^= zobrist_ep_file(chess_move.origin.file());
+
                 self.ep_data = Some(EpData {
                     // SAFETY: See above.
                     capture_point: unsafe {
@@ -344,7 +350,55 @@ impl Board {
         is_pawn_move || is_capture
     }
 
-    pub fn approx_equal(&self, other: &Board) -> bool {
-        self.hash == other.hash
+    pub fn interpret_move(&self, move_str: &str) -> Result<Move, &'static str> {
+        if move_str.len() < 4 || move_str.len() > 5 {
+            return Err("Input too short");
+        }
+
+        let origin = Square::from_str(&move_str[0..2])?;
+        let target = Square::from_str(&move_str[2..4])?;
+
+        let moved_piece_kind = if let Some(piece) = self.get_piece(origin) {
+            piece.kind
+        } else {
+            return Err("Move is impossible in the given context");
+        };
+
+        Ok(Move {
+            origin,
+            target,
+            moved_piece_kind,
+            meta: if (moved_piece_kind == PieceKind::King)
+                && (origin == Square::E1 || origin == Square::E8)
+            {
+                if target == Square::G1 || target == Square::G8 {
+                    MoveMeta::CastleKs
+                } else if target == Square::C1 || target == Square::C8 {
+                    MoveMeta::CastleQs
+                } else {
+                    MoveMeta::None
+                }
+            } else if moved_piece_kind == PieceKind::Pawn {
+                if (origin.rank() == 1 || origin.rank() == 6)
+                    && (target.rank() == 3 || target.rank() == 4)
+                {
+                    MoveMeta::DoublePush
+                } else if (origin.file() != target.file()) && self.get_piece(target).is_none() {
+                    MoveMeta::EnPassant
+                } else {
+                    MoveMeta::None
+                }
+            } else if move_str.len() == 5 {
+                MoveMeta::Promotion(match &move_str[4..5] {
+                    "q" => PieceKind::Queen,
+                    "r" => PieceKind::Rook,
+                    "b" => PieceKind::Bishop,
+                    "n" => PieceKind::Knight,
+                    _ => return Err("Invalid promotion piece"),
+                })
+            } else {
+                MoveMeta::None
+            },
+        })
     }
 }

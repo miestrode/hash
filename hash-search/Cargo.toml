@@ -9,3 +9,4 @@ edition = "2021"
 [dependencies]
 hash-core = { path = "../hash-core/" }
 rayon = "1.7.0"
+portable-atomic = "1.4.2"

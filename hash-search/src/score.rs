@@ -25,6 +25,10 @@ impl Score {
         }
     }
 
+    pub fn from_int(score: i16) -> Self {
+        Self { value: score }
+    }
+
     pub fn flip_in_place(&mut self) {
         self.value *= -1;
     }
@@ -32,6 +36,10 @@ impl Score {
     pub fn flip(mut self) -> Self {
         self.flip_in_place();
         self
+    }
+
+    pub fn as_int(&self) -> i16 {
+        self.value
     }
 }
 

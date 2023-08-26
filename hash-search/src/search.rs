@@ -8,10 +8,10 @@ use crate::{
     Eval,
 };
 
-pub(crate) fn negamax<E: Eval + Sync>(
+pub(crate) fn negamax<E: Eval + Sync, const N: usize>(
     game: &Game,
     evaluator: &E,
-    tt: &mut tt::Table,
+    tt: &tt::Table<N>,
     depth: i16,
     start_depth: i16,
     mut alpha: Score,
@@ -24,20 +24,19 @@ pub(crate) fn negamax<E: Eval + Sync>(
         evaluation,
         metadata,
         depth: entry_depth,
+        ..
     }) = tt.get(&game.board)
     {
         // TODO: Consider somehow utilizing the reselt of the shallower search, instead of just
         // discarding it.
-        if entry_depth >= depth {
-            match metadata {
-                EntryMetadata::Exact => return evaluation,
-                EntryMetadata::LowerBound => alpha = alpha.max(evaluation),
-                EntryMetadata::UpperBound => beta = beta.min(evaluation),
-            }
+        match metadata {
+            EntryMetadata::Exact => return evaluation,
+            EntryMetadata::LowerBound => alpha = alpha.max(evaluation),
+            EntryMetadata::UpperBound => beta = beta.min(evaluation),
+        }
 
-            if alpha >= beta {
-                return evaluation;
-            }
+        if alpha >= beta {
+            return evaluation;
         }
     }
 
@@ -77,16 +76,14 @@ pub(crate) fn negamax<E: Eval + Sync>(
 
         tt.insert(
             &game.board,
-            Entry {
-                evaluation,
-                depth,
-                metadata: if evaluation <= original_alpha {
-                    EntryMetadata::UpperBound
-                } else if evaluation >= beta {
-                    EntryMetadata::LowerBound
-                } else {
-                    EntryMetadata::Exact
-                },
+            evaluation,
+            depth,
+            if evaluation <= original_alpha {
+                EntryMetadata::UpperBound
+            } else if evaluation >= beta {
+                EntryMetadata::LowerBound
+            } else {
+                EntryMetadata::Exact
             },
         );
 
