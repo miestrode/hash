@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub const MOVES: usize = 218;
-type Moves = ArrayVec<Move, MOVES>;
+pub type Moves = ArrayVec<Move, MOVES>;
 
 pub trait Gen {
     fn dangers(pieces: BitBoard, occupation: BitBoard, color: Color, dangers: &mut BitBoard);

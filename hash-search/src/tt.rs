@@ -6,7 +6,7 @@ use portable_atomic::{AtomicU128, Ordering};
 use crate::score::Score;
 
 const BYTE_IN_MIB: usize = 1024 * 1024;
-const TABLE_ENTRIES: usize = 300 * BYTE_IN_MIB / mem::size_of::<AtomicEntry>();
+const TABLE_ENTRIES: usize = 64 * BYTE_IN_MIB / mem::size_of::<AtomicEntry>();
 
 #[derive(Clone, Copy)]
 pub(crate) enum EntryMetadata {

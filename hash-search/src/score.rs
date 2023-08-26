@@ -1,4 +1,7 @@
-use std::fmt::{Display, Write};
+use std::{
+    fmt::{Display, Write},
+    ops::Div,
+};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct Score {
@@ -7,7 +10,7 @@ pub struct Score {
 
 impl Score {
     pub const MATE_MAXIMUM: i16 = i16::MAX;
-    pub const SCORE_MAXIMUM: i16 = 10;
+    pub const SCORE_MAXIMUM: i16 = 200;
 
     pub const DRAW: Self = Self { value: 0 };
     pub const WORST: Self = Self::from_mate_distance(-1);
@@ -45,9 +48,11 @@ impl Score {
 
 impl Display for Score {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.value > Score::SCORE_MAXIMUM {
+        if self.value.abs() > Score::SCORE_MAXIMUM {
             f.write_char('#')?;
-            ((Score::MATE_MAXIMUM * self.value.signum() - self.value + 1) / 2).fmt(f)
+            (Score::MATE_MAXIMUM * self.value.signum() - self.value + self.value.signum())
+                .div(2)
+                .fmt(f)
         } else {
             self.value.fmt(f)
         }
