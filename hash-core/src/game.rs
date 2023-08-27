@@ -387,7 +387,8 @@ impl Game {
 
             // TODO:: Add utility methods to the cache API, to make this code nicer
             if let Some(value) = self.repetition_cache.get(&self.board) {
-                self.repetition_cache.insert(&self.board, value - 1);
+                self.repetition_cache
+                    .insert(&self.board, value.saturating_sub(1));
             }
 
             true

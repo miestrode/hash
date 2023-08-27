@@ -1,4 +1,4 @@
-use std::convert;
+use std::{convert, time::Instant};
 
 use hash_core::{
     game::{Game, Outcome},
@@ -11,8 +11,6 @@ use crate::{
     tt::{self, Entry, EntryMetadata},
     Eval,
 };
-
-const CANDIDATE_HISTORY_START_CAPACITY: usize = 10;
 
 fn negamax<E: Eval + Sync, const N: usize>(
     game: &mut Game,
@@ -101,7 +99,7 @@ fn negamax<E: Eval + Sync, const N: usize>(
     }
 }
 
-fn null_window_test<E: Eval + Sync, const N: usize>(
+fn null_window_search<E: Eval + Sync, const N: usize>(
     game: &mut Game,
     evaluator: &E,
     tt: &tt::Table<N>,
@@ -115,7 +113,7 @@ fn null_window_test<E: Eval + Sync, const N: usize>(
         game,
         evaluator,
         tt,
-        depth,
+        depth - 1,
         depth,
         guess.flip(),
         Score::from_int(-(guess.as_int() - 1)),
@@ -133,41 +131,45 @@ fn bns<E: Eval + Sync, const N: usize>(
     evaluator: &E,
     tt: &tt::Table<N>,
     depth: i16,
-    mut alpha: Score,
-    mut beta: Score,
-) -> Moves {
-    fn next_guess(mut alpha: i16, mut beta: i16, subtree_count: usize) -> Score {
-        if alpha <= 0 {
-            beta = beta.min(i16::MAX / 2);
-        }
+    initial_guess: Score,
+    quality: f32,
+) -> (Move, Score) {
+    let mut alpha = Score::WORST;
+    let mut beta = Score::BEST;
 
-        if beta >= 0 {
-            alpha = alpha.max(-i16::MAX / 2)
-        }
+    fn next_guess(alpha: Score, beta: Score, subtree_count: usize) -> Score {
+        let subtree_count = subtree_count as i64;
+        let alpha = alpha.as_int() as i64;
+        let beta = beta.as_int() as i64;
 
-        let mut guess = alpha
-            + ((beta - alpha) as f32 * (subtree_count as f32 - 1.0) / subtree_count as f32) as i16;
-
-        if guess == alpha {
-            guess += 1;
-        } else if guess == beta {
-            guess -= 1;
-        }
-
-        Score::from_int(guess)
+        // There are a total of subtree_count subtrees above the guess we had. We only want one
+        // subtree to remain. Therefore, we should have the new guess go up to subtree_count - 1 of
+        // the way, assuming the subtree cutoff points are distributed uniformly.
+        Score::from_int((alpha + (beta - alpha) * (subtree_count - 1) / subtree_count) as i16)
     }
 
     let mut candidates = mg::gen_moves(&game.board);
+    let mut guess = initial_guess;
+    let mut bound = 1;
 
     loop {
-        let guess = next_guess(alpha.as_int(), beta.as_int(), candidates.len());
         let mut new_candidates = Moves::new();
 
-        for candidate in &candidates {
-            if null_window_test(game, evaluator, tt, depth, candidate, guess) >= guess {
+        for (candidate, checked) in candidates.iter().zip(1..) {
+            if null_window_search(game, evaluator, tt, depth, candidate, guess) >= guess {
+                let expected_quality = 1.0
+                    / ((new_candidates.len() + 1) as f32 / checked as f32
+                        * candidates.len() as f32);
+
+                if expected_quality >= quality {
+                    return (*candidate, guess);
+                }
+
                 new_candidates.push(*candidate);
             }
         }
+
+        println!("{alpha} <= {guess} <= {beta}: {}", new_candidates.len(),);
 
         if new_candidates.is_empty() {
             beta = guess;
@@ -177,46 +179,42 @@ fn bns<E: Eval + Sync, const N: usize>(
         }
 
         if beta.as_int() <= alpha.as_int() + 1 || candidates.len() == 1 {
-            break candidates;
+            break (candidates[0], guess);
         }
+
+        guess = Score::from_int(
+            guess.as_int()
+                + (next_guess(alpha, beta, candidates.len()).as_int() - guess.as_int())
+                    .clamp(-bound, bound),
+        );
+        bound *= 2;
     }
 }
 
+// TODO: Change the target quality during the deepening
+// TODO: Add the ability to terminate early when it is believed that will be unharmful
 pub(crate) fn optimize<E: Eval + Sync, const N: usize>(
     game: &mut Game,
     evaluator: &E,
     tt: &tt::Table<N>,
-    repetitions_necessary: usize,
+    max_depth: i16,
+    quality: f32,
 ) -> Option<Move> {
-    let mut depth = 1;
-    let mut candidates_history: Vec<Moves> = Vec::with_capacity(CANDIDATE_HISTORY_START_CAPACITY);
+    let mut best_move = None;
+    let mut guess = Score::DRAW;
+    let initial = Instant::now();
 
-    fn get_matches(candidate: &Move, candidates_history: &[Moves]) -> usize {
-        candidates_history
-            .iter()
-            .filter(|candidates| candidates.contains(candidate))
-            .count()
+    for depth in 1..=max_depth {
+        println!("START DEPTH {depth}");
+        let time = Instant::now();
+        let (new_best_move, new_guess) = bns(game, evaluator, tt, depth, guess, quality);
+        println!("FINISH IN {}ms", time.elapsed().as_millis());
+
+        best_move = Some(new_best_move);
+        guess = new_guess;
     }
 
-    loop {
-        let candidates = bns(game, evaluator, tt, depth, Score::WORST, Score::BEST);
+    println!("TOTAL TIME: {}ms", initial.elapsed().as_millis());
 
-        for candidate in &candidates {
-            print!("{candidate}, ");
-        }
-        println!();
-
-        if !candidates.is_empty()
-            && candidates.iter().all(|candidate| {
-                get_matches(candidate, &candidates_history) >= repetitions_necessary
-            })
-        {
-            break candidates
-                .into_iter()
-                .max_by_key(|candidate| get_matches(candidate, &candidates_history));
-        }
-
-        candidates_history.push(candidates);
-        depth += 1;
-    }
+    best_move
 }
