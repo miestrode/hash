@@ -243,6 +243,26 @@ impl Default for Game {
 }
 
 impl Game {
+    pub fn perft(&mut self, depth: u32) -> u64 {
+        let moves = mg::gen_moves(&self.board);
+
+        match depth {
+            // At a depth of one we know all next moves will reach depth zero.
+            // Thus, we can know they are all leaves and add one each to the nodes searched.
+            1 => moves.len() as u64,
+            _ => moves
+                .into_iter()
+                .map(|chess_move| {
+                    unsafe { self.make_move_unchecked(&chess_move) };
+                    let result = self.perft(depth - 1);
+                    self.unmake_last_move();
+
+                    result
+                })
+                .sum(),
+        }
+    }
+
     // SAFETY: The move is assumed to be legal
     pub unsafe fn make_move_unchecked(&mut self, chess_move: &Move) {
         self.restoration_data.push(RestorationData {
@@ -290,13 +310,15 @@ impl Game {
             self.board.ep_data = restoration_data.ep_data;
 
             if let MoveMeta::Promotion(piece_kind) = restoration_data.applied_move.meta {
-                self.board.current_player.toggle_piece(
-                    restoration_data.applied_move.moved_piece_kind,
-                    restoration_data.applied_move.origin,
-                );
+                self.board
+                    .current_player
+                    .toggle_piece(PieceKind::Pawn, restoration_data.applied_move.origin);
                 self.board
                     .current_player
                     .toggle_piece(piece_kind, restoration_data.applied_move.target);
+                self.board
+                    .piece_table
+                    .set(Some(PieceKind::Pawn), restoration_data.applied_move.origin);
             } else {
                 unsafe {
                     self.board.current_player.move_piece_unchecked(
@@ -360,22 +382,22 @@ impl Game {
                     Color::White => unsafe {
                         self.board.current_player.move_piece_unchecked(
                             PieceKind::Rook,
-                            Square::C1,
+                            Square::D1,
                             Square::BOTTOM_LEFT_ROOK,
                         );
                         self.board
                             .piece_table
-                            .move_piece(Square::C1, Square::BOTTOM_LEFT_ROOK);
+                            .move_piece(Square::D1, Square::BOTTOM_LEFT_ROOK);
                     },
                     Color::Black => unsafe {
                         self.board.current_player.move_piece_unchecked(
                             PieceKind::Rook,
-                            Square::C8,
+                            Square::D8,
                             Square::TOP_LEFT_ROOK,
                         );
                         self.board
                             .piece_table
-                            .move_piece(Square::C8, Square::TOP_LEFT_ROOK);
+                            .move_piece(Square::D8, Square::TOP_LEFT_ROOK);
                     },
                 },
                 _ => {}

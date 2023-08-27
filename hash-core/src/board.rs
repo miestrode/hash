@@ -338,17 +338,17 @@ impl Board {
                     MoveMeta::DoublePush
                 } else if (origin.file() != target.file()) && self.get_piece(target).is_none() {
                     MoveMeta::EnPassant
+                } else if move_str.len() == 5 {
+                    MoveMeta::Promotion(match &move_str[4..5] {
+                        "q" => PieceKind::Queen,
+                        "r" => PieceKind::Rook,
+                        "b" => PieceKind::Bishop,
+                        "n" => PieceKind::Knight,
+                        _ => return Err("Invalid promotion piece"),
+                    })
                 } else {
                     MoveMeta::None
                 }
-            } else if move_str.len() == 5 {
-                MoveMeta::Promotion(match &move_str[4..5] {
-                    "q" => PieceKind::Queen,
-                    "r" => PieceKind::Rook,
-                    "b" => PieceKind::Bishop,
-                    "n" => PieceKind::Knight,
-                    _ => return Err("Invalid promotion piece"),
-                })
             } else {
                 MoveMeta::None
             },
