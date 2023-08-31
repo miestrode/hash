@@ -1,5 +1,10 @@
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
 use hash_core::{board::Board, repr::Player};
 use hash_search::{score::Score, Eval};
+
+pub mod model;
+pub mod train;
 
 // An i32 is used here since we are, during evaluation, subtracting material
 fn material(player: Player) -> i16 {

@@ -1,6 +1,6 @@
 [package]
 name = "hash-eval"
-description = "CNN for Chess evaluation, part of the Hash Chess engine"
+description = "CNN for Chess position evaluation, part of the Hash Chess Engine"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,4 +9,5 @@ edition = "2021"
 [dependencies]
 hash-core = { path = "../hash-core" }
 hash-search = { path = "../hash-search" }
-dfdx = "0.13.0"
+dfdx = { version = "0.13.0", features = ["nightly", "f16"] }
+arrayvec = "0.7.4"

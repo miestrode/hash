@@ -15,8 +15,7 @@ use crate::{
 use hash_build::{BitBoard, Color, Square};
 
 pub enum Outcome {
-    BlackWin,
-    WhiteWin,
+    Win(Color),
     Draw,
 }
 
@@ -427,10 +426,7 @@ impl Game {
             // If a player is in check, he is attacked and so this is mate. The player who is
             // moving thus lost
             if self.board.current_player.is_in_check() {
-                Some(match self.board.current_color {
-                    Color::White => Outcome::BlackWin,
-                    Color::Black => Outcome::WhiteWin,
-                })
+                Some(Outcome::Win(self.board.current_color))
             } else {
                 // Otherwise, it's stalemate
                 Some(Outcome::Draw)
