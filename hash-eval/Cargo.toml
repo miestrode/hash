@@ -9,5 +9,3 @@ edition = "2021"
 [dependencies]
 hash-core = { path = "../hash-core" }
 hash-search = { path = "../hash-search" }
-dfdx = { version = "0.13.0", features = ["nightly", "f16"] }
-arrayvec = "0.7.4"
