@@ -1,16 +1,20 @@
-use std::{convert, time::Instant};
+use std::{convert, sync::RwLock, time::Instant};
 
 use hash_core::{
     game::{Game, Outcome},
     mg::{self, Moves},
     repr::Move,
 };
+use portable_atomic::AtomicU8;
+use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use crate::{
     score::Score,
     tt::{self, Entry, EntryMetadata},
     Eval,
 };
+
+const THREADS: usize = 8;
 
 fn negamax<E: Eval + Sync, const N: usize>(
     game: &mut Game,
@@ -153,9 +157,15 @@ fn bns<E: Eval + Sync, const N: usize>(
     let mut bound = 1;
 
     loop {
-        let mut new_candidates = Moves::new();
+        // TODO: Make Move be atomic, to avoid this
+        let mut new_candidates = RwLock::new(Moves::new());
+        let mut checked = AtomicU8::new(0);
+        let mut pool = ThreadPoolBuilder::new()
+            .num_threads(THREADS)
+            .build()
+            .unwrap();
 
-        for (candidate, checked) in candidates.iter().zip(1..) {
+        for candidate in candidates {
             if null_window_search(game, evaluator, tt, depth, candidate, guess) >= guess {
                 let expected_quality = 1.0
                     / ((new_candidates.len() + 1) as f32 / checked as f32
