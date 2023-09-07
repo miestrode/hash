@@ -6,15 +6,13 @@ use hash_core::{
     repr::Move,
 };
 use portable_atomic::AtomicU8;
-use rayon::{ThreadPool, ThreadPoolBuilder};
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     score::Score,
     tt::{self, Entry, EntryMetadata},
     Eval,
 };
-
-const THREADS: usize = 8;
 
 fn negamax<E: Eval + Sync, const N: usize>(
     game: &mut Game,
@@ -158,26 +156,34 @@ fn bns<E: Eval + Sync, const N: usize>(
 
     loop {
         // TODO: Make Move be atomic, to avoid this
-        let mut new_candidates = RwLock::new(Moves::new());
-        let mut checked = AtomicU8::new(0);
-        let mut pool = ThreadPoolBuilder::new()
-            .num_threads(THREADS)
-            .build()
-            .unwrap();
+        let new_candidates = RwLock::new(Moves::new());
+        let checked = AtomicU8::new(0);
+        let result = RwLock::new(None);
 
-        for candidate in candidates {
-            if null_window_search(game, evaluator, tt, depth, candidate, guess) >= guess {
+        candidates.par_iter().for_each(|candidate| {
+            if result.read().unwrap().is_none()
+                && null_window_search(&mut game.clone(), evaluator, tt, depth, candidate, guess)
+                    >= guess
+            {
                 let expected_quality = 1.0
-                    / ((new_candidates.len() + 1) as f32 / checked as f32
+                    / ((new_candidates.read().unwrap().len() + 1) as f32
+                        / checked.load(portable_atomic::Ordering::Acquire) as f32
                         * candidates.len() as f32);
 
                 if expected_quality >= quality {
-                    return (*candidate, guess);
+                    *result.write().unwrap() = Some((*candidate, guess));
+                } else {
+                    checked.add(1, portable_atomic::Ordering::AcqRel);
+                    new_candidates.write().unwrap().push(*candidate);
                 }
-
-                new_candidates.push(*candidate);
             }
+        });
+
+        if let Some(value) = result.into_inner().unwrap() {
+            return value;
         }
+
+        let new_candidates = new_candidates.into_inner().unwrap();
 
         println!("{alpha} <= {guess} <= {beta}: {}", new_candidates.len(),);
 

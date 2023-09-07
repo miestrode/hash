@@ -19,6 +19,7 @@ pub enum Outcome {
     Draw,
 }
 
+#[derive(Clone, Copy)]
 struct RestorationData {
     current_origin_castling_right: bool,
     opposing_target_castling_right: bool,
@@ -35,6 +36,7 @@ struct RestorationData {
 const CACHE_LENGTH: usize = 1000;
 const RESTORATION_DATA_START_CAPACITY: usize = 8;
 
+#[derive(Clone)]
 pub struct Game {
     pub board: Board,
     half_moves: u16, // This is the number of half moves since the last capture or pawn move
