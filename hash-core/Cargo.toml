@@ -18,9 +18,9 @@ name = "fen"
 harness = false
 
 [build-dependencies]
-hash-build = { path = "../hash-build" }
+hash-bootstrap = { path = "../hash-bootstrap" }
 rand = "0.8.5"
 
 [dependencies]
-arrayvec = "0.7.2"
-hash-build = { path = "../hash-build" }
+arrayvec = "0.7.4"
+hash-bootstrap = { path = "../hash-bootstrap" }

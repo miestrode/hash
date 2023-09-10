@@ -8,7 +8,7 @@ Hash is also a learning project for me, and as a goal attempts to use as much Ru
 ## To do
 The primary things as of right now to be done, are:
 
-- [ ] Get a final design for parallel BNS search and implement it
+- [x] Get a final design for parallel BNS search and implement it
 - [ ] Bridge between the ML framework chosen and `hash-core`, to implement the training code
 - [ ] Write the training code for the CNN
 - [ ] Refactor the codebase and make a nicer internal and external API for `hash-core`

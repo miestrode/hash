@@ -1,36 +1,92 @@
 use arrayvec::ArrayVec;
-use hash_build::{BitBoard, Color, Square};
+use hash_bootstrap::{BitBoard, Color, Square};
 
 use crate::{
     board::Board,
     index,
-    repr::{EpData, Move, MoveMeta, PieceKind},
+    repr::{Move, PieceKind},
 };
 
 pub const MOVES: usize = 218;
 pub type Moves = ArrayVec<Move, MOVES>;
 
-pub trait Gen {
-    fn dangers(pieces: BitBoard, occupation: BitBoard, color: Color, dangers: &mut BitBoard);
+pub(crate) trait Gen {
+    const PIECE_KIND: PieceKind;
 
-    fn legal_moves(board: &Board, occupation: BitBoard, moves: &mut Moves);
+    fn pseudo_legal_moves(
+        origin: Square,
+        friendly_occupation: BitBoard,
+        occupation: BitBoard,
+        color: Color,
+    ) -> BitBoard;
+    fn legal_moves(board: &Board, moves: &mut Moves) {
+        let pieces = *board.current_player.piece_bitboard(Self::PIECE_KIND);
+        let occupation = board.occupation();
+        let king_square = board.current_player.king.try_into().unwrap();
+        let valid_targets = if board.in_check() {
+            // NOTE: If this code was invoked there is a single checker. If it isn't a sliding piece
+            // there won't be a line between the checker and the king (except for pawns, but in this
+            // case the line is fine).
+            // Likewise we are adding the checker bitboard, as the line between the squares
+            // doesn't include its edge points and for the cases where we don't have sliding piece
+            // checking the king.
+            board.checkers ^ index::line_between(board.checkers.try_into().unwrap(), king_square)
+        } else {
+            BitBoard::FULL
+        };
+
+        for piece in (pieces - board.current_player.pinned).bits() {
+            for target in Self::pseudo_legal_moves(
+                piece,
+                board.current_player.occupation,
+                occupation,
+                board.current_color,
+            ) & valid_targets
+            {
+                moves.push(Move {
+                    origin: piece,
+                    target,
+                    promotion: None,
+                });
+            }
+        }
+
+        if !board.in_check() {
+            for piece in (pieces & board.current_player.pinned).bits() {
+                for target in Self::pseudo_legal_moves(
+                    piece,
+                    board.current_player.occupation,
+                    occupation,
+                    board.current_color,
+                ) & index::line_fit(king_square, piece)
+                {
+                    moves.push(Move {
+                        origin: piece,
+                        target,
+                        promotion: None,
+                    });
+                }
+            }
+        }
+    }
 }
 
 pub struct Pawn;
 
 impl Pawn {
-    fn is_legal_ep_capture(
+    unsafe fn is_legal_ep_capture(
         board: &Board,
         mut occupation: BitBoard,
-        ep_data: EpData,
+        en_passant_pawn: Square,
         origin: Square,
     ) -> bool {
         // Update board to it's post capture state
         occupation.toggle_bit(origin);
-        occupation.toggle_bit(ep_data.capture_point.first_one_as_square());
-        occupation.toggle_bit(ep_data.pawn);
+        occupation
+            .toggle_bit(unsafe { en_passant_pawn.move_one_up_unchecked(board.current_color) });
+        occupation.toggle_bit(en_passant_pawn);
 
-        let king = board.current_player.king.first_one_as_square();
+        let king = board.current_player.king.try_into().unwrap();
 
         // Test for any rays hitting the king
         ((index::bishop_slides(king, occupation)
@@ -39,165 +95,42 @@ impl Pawn {
                 & (board.opposing_player.queens + board.opposing_player.rooks)))
             .is_empty()
     }
-
-    fn update_moves(origin: Square, target: Square, moves: &mut Moves) {
-        if target.rank() == 0 || target.rank() == 7 {
-            moves.extend(PieceKind::PROMOTIONS.into_iter().map(|piece| {
-                Move {
-                    // SAFETY: Reversing the movement always returns a valid pawn square, by definition
-                    origin,
-                    target,
-                    meta: MoveMeta::Promotion(piece),
-                    moved_piece_kind: PieceKind::Pawn,
-                }
-            }));
-        } else {
-            moves.push(Move {
-                // SAFETY: Reversing the movement always returns a valid pawn square, by definition
-                origin,
-                target,
-                moved_piece_kind: PieceKind::Pawn,
-                meta: MoveMeta::None,
-            })
-        }
-    }
 }
 
 impl Gen for Pawn {
-    fn dangers(pieces: BitBoard, _occupation: BitBoard, color: Color, dangers: &mut BitBoard) {
-        *dangers += pieces.move_one_up_left(color) + pieces.move_one_up_right(color);
+    const PIECE_KIND: PieceKind = PieceKind::Pawn;
+
+    fn pseudo_legal_moves(
+        origin: Square,
+        friendly_occupation: BitBoard,
+        occupation: BitBoard,
+        color: Color,
+    ) -> BitBoard {
+        index::pawn_moves(
+            origin,
+            friendly_occupation,
+            occupation - friendly_occupation,
+            color,
+        )
     }
 
-    // TODO: There is some debate in the CP community over whether set-wise or piece-wise
-    // operations are better here. Currently set-wise is used for familiarity and hopefully speed.
-    // I want to verfiy what option is truely the best here.
-    fn legal_moves(board: &Board, occupation: BitBoard, moves: &mut Moves) {
-        let unpinned_push_pawns =
-            board.current_player.pawns & board.current_player.pins.vertical_movement();
+    fn legal_moves(board: &Board, moves: &mut Moves) {
+        let occupation = board.occupation();
+        let king_square = board.current_player.king.try_into().unwrap();
+        let valid_targets = if board.in_check() {
+            // NOTE: If this code was invoked there is a single checker. If it isn't a sliding piece
+            // there won't be a line between the checker and the king (except for pawns, but in this
+            // case the line is fine).
+            // Likewise we are adding the checker bitboard, as the line between the squares
+            // doesn't include its edge points and for the cases where we don't have sliding piece
+            // checking the king.
+            board.checkers ^ index::line_between(board.checkers.try_into().unwrap(), king_square)
+        } else {
+            BitBoard::FULL
+        };
 
-        // Pawn pushes
-        {
-            let pawn_targets = (unpinned_push_pawns.move_one_up(board.current_color)
-                & board.current_player.valid_targets)
-                - occupation;
-
-            for target in pawn_targets {
-                // SAFETY: Reversing the movement always returns a valid pawn square, by definition
-                Self::update_moves(
-                    unsafe { target.move_one_down_unchecked(board.current_color) },
-                    target,
-                    moves,
-                );
-            }
-        }
-
-        // Pawn double pushes
-        {
-            let pawn_targets = ((unpinned_push_pawns & BitBoard::PAWN_START_RANKS)
-                .move_two_up(board.current_color)
-                & board.current_player.valid_targets)
-                // The smearing blocks pushes through pieces
-                - occupation.smear_ones_up(board.current_color);
-
-            moves.extend(pawn_targets.bits().map(|target| Move {
-                // SAFETY: See above
-                origin: unsafe { target.move_two_down_unchecked(board.current_color) },
-                target,
-                moved_piece_kind: PieceKind::Pawn,
-                meta: MoveMeta::DoublePush,
-            }));
-        }
-
-        let unpinned_right_capture_pawns =
-            board.current_player.pawns & board.current_player.pins.diagonal_movement();
-
-        // Right pawn captures
-        {
-            let pawn_targets = unpinned_right_capture_pawns.move_one_up_right(board.current_color)
-                & board.current_player.valid_targets
-                & board.opposing_player.occupation;
-
-            for target in pawn_targets {
-                // SAFETY: Reversing the movement always returns a valid pawn square, by definition
-                Self::update_moves(
-                    unsafe { target.move_one_down_left_unchecked(board.current_color) },
-                    target,
-                    moves,
-                );
-            }
-        }
-
-        let unpinned_left_capture_pawns =
-            board.current_player.pawns & board.current_player.pins.anti_diagonal_movement();
-
-        // Left pawn captures
-        {
-            let pawn_targets = unpinned_left_capture_pawns.move_one_up_left(board.current_color)
-                & board.current_player.valid_targets
-                & board.opposing_player.occupation;
-
-            for target in pawn_targets {
-                // SAFETY: Reversing the movement always returns a valid pawn square, by definition
-                Self::update_moves(
-                    unsafe { target.move_one_down_right_unchecked(board.current_color) },
-                    target,
-                    moves,
-                );
-            }
-        }
-
-        if let Some(
-            ep_data @ EpData {
-                capture_point,
-                pawn,
-            },
-        ) = board.ep_data
-        {
-            if (pawn.as_bitboard() & board.current_player.valid_targets).isnt_empty() {
-                // Right EP captures
-                {
-                    let capturer = capture_point.move_one_down_left(board.current_color)
-                        & unpinned_right_capture_pawns;
-
-                    if capturer.isnt_empty()
-                        && Pawn::is_legal_ep_capture(
-                            board,
-                            occupation,
-                            ep_data,
-                            capturer.first_one_as_square(),
-                        )
-                    {
-                        moves.push(Move {
-                            origin: capturer.first_one_as_square(),
-                            moved_piece_kind: PieceKind::Pawn,
-                            target: capture_point.first_one_as_square(),
-                            meta: MoveMeta::EnPassant,
-                        });
-                    }
-                }
-
-                // Left EP captures
-                {
-                    let capturer = capture_point.move_one_down_right(board.current_color)
-                        & unpinned_left_capture_pawns;
-
-                    if capturer.isnt_empty()
-                        && Pawn::is_legal_ep_capture(
-                            board,
-                            occupation,
-                            ep_data,
-                            capturer.first_one_as_square(),
-                        )
-                    {
-                        moves.push(Move {
-                            origin: capturer.first_one_as_square(),
-                            moved_piece_kind: PieceKind::Pawn,
-                            target: capture_point.first_one_as_square(),
-                            meta: MoveMeta::EnPassant,
-                        });
-                    }
-                }
-            }
+        for pawn in (board.current_player.pawns - board.pinned).bits() {
+            pawn.move_one_up_
         }
     }
 }
@@ -205,23 +138,48 @@ impl Gen for Pawn {
 pub struct Knight;
 
 impl Gen for Knight {
-    fn dangers(pieces: BitBoard, _occupation: BitBoard, _color: Color, dangers: &mut BitBoard) {
-        for piece in pieces {
-            *dangers += index::knight_attacks(piece);
-        }
+    const PIECE_KIND: PieceKind = PieceKind::Knight;
+
+    fn pseudo_legal_moves(
+        origin: Square,
+        friendly_occupation: BitBoard,
+        _occupation: BitBoard,
+        _color: Color,
+    ) -> BitBoard {
+        index::knight_attacks(origin) - friendly_occupation
     }
 
-    fn legal_moves(board: &Board, _occupation: BitBoard, moves: &mut Moves) {
-        for piece in board.current_player.knights - board.current_player.pins.all() {
-            let attacks = (index::knight_attacks(piece) & board.current_player.valid_targets)
-                - board.current_player.occupation;
+    // This is essentially identical to the regular `legal_moves`, except we don't care about pinned
+    // pieces, as a pinned knight cannot move.
+    fn legal_moves(board: &Board, moves: &mut Moves) {
+        let occupation = board.occupation();
+        let king_square = board.current_player.king.try_into().unwrap();
+        let valid_targets = if board.in_check() {
+            // NOTE: If this code was invoked there is a single checker. If it isn't a sliding piece
+            // there won't be a line between the checker and the king (except for pawns, but in this
+            // case the line is fine).
+            // Likewise we are adding the checker bitboard, as the line between the squares
+            // doesn't include its edge points and for the cases where we don't have sliding piece
+            // checking the king.
+            board.checkers ^ index::line_between(board.checkers.try_into().unwrap(), king_square)
+        } else {
+            BitBoard::FULL
+        };
 
-            moves.extend(attacks.bits().map(|target| Move {
-                origin: piece,
-                target,
-                moved_piece_kind: PieceKind::Knight,
-                meta: MoveMeta::None,
-            }))
+        for piece in (board.current_player.knights - board.current_player.pinned).bits() {
+            for target in Self::pseudo_legal_moves(
+                piece,
+                board.current_player.occupation,
+                occupation,
+                board.current_color,
+            ) & valid_targets
+            {
+                moves.push(Move {
+                    origin: piece,
+                    target,
+                    promotion: None,
+                });
+            }
         }
     }
 }
@@ -229,186 +187,91 @@ impl Gen for Knight {
 pub struct Bishop;
 
 impl Gen for Bishop {
-    #[inline(always)]
-    fn dangers(pieces: BitBoard, occupation: BitBoard, _color: Color, dangers: &mut BitBoard) {
-        for piece in pieces {
-            *dangers += index::bishop_slides(piece, occupation);
-        }
-    }
+    const PIECE_KIND: PieceKind = PieceKind::Bishop;
 
-    #[inline(always)]
-    fn legal_moves(board: &Board, occupation: BitBoard, moves: &mut Moves) {
-        let valid_bishops = board.current_player.bishops - board.current_player.pins.cross_pins();
-
-        // One for unpinned bishops
-        for bishop in valid_bishops - board.current_player.pins.diagonal_pins() {
-            moves.extend(
-                ((index::bishop_slides(bishop, occupation) - board.current_player.occupation)
-                    & board.current_player.valid_targets)
-                    .bits()
-                    .map(|target| Move {
-                        origin: bishop,
-                        target,
-                        meta: MoveMeta::None,
-                        moved_piece_kind: PieceKind::Bishop,
-                    }),
-            );
-        }
-
-        // One for pinned bishops
-        for bishop in valid_bishops & board.current_player.pins.diagonal_pins() {
-            moves.extend(
-                (index::bishop_slides(bishop, occupation)
-                    & board.current_player.pins.diagonal_pins()
-                    & board.current_player.valid_targets)
-                    .bits()
-                    .map(|target| Move {
-                        origin: bishop,
-                        target,
-                        meta: MoveMeta::None,
-                        moved_piece_kind: PieceKind::Bishop,
-                    }),
-            );
-        }
+    fn pseudo_legal_moves(
+        origin: Square,
+        friendly_occupation: BitBoard,
+        occupation: BitBoard,
+        _color: Color,
+    ) -> BitBoard {
+        index::bishop_slides(origin, occupation) - friendly_occupation
     }
 }
 
 pub struct Rook;
 
 impl Gen for Rook {
-    fn dangers(pieces: BitBoard, occupation: BitBoard, _color: Color, dangers: &mut BitBoard) {
-        for piece in pieces {
-            *dangers += index::rook_slides(piece, occupation);
-        }
-    }
+    const PIECE_KIND: PieceKind = PieceKind::Rook;
 
-    fn legal_moves(board: &Board, occupation: BitBoard, moves: &mut Moves) {
-        let valid_rooks = board.current_player.rooks - board.current_player.pins.diagonal_pins();
-
-        // One for unpinned rooks
-        for rook in valid_rooks - board.current_player.pins.cross_pins() {
-            moves.extend(
-                ((index::rook_slides(rook, occupation) - board.current_player.occupation)
-                    & board.current_player.valid_targets)
-                    .bits()
-                    .map(|target| Move {
-                        origin: rook,
-                        target,
-                        meta: MoveMeta::None,
-                        moved_piece_kind: PieceKind::Rook,
-                    }),
-            );
-        }
-
-        // One for pinned rooks
-        for rook in valid_rooks & board.current_player.pins.cross_pins() {
-            moves.extend(
-                ((index::rook_slides(rook, occupation) & board.current_player.pins.cross_pins())
-                    & board.current_player.valid_targets)
-                    .bits()
-                    .map(|target| Move {
-                        origin: rook,
-                        target,
-                        meta: MoveMeta::None,
-                        moved_piece_kind: PieceKind::Rook,
-                    }),
-            );
-        }
+    fn pseudo_legal_moves(
+        origin: Square,
+        friendly_occupation: BitBoard,
+        occupation: BitBoard,
+        _color: Color,
+    ) -> BitBoard {
+        index::rook_slides(origin, occupation) - friendly_occupation
     }
 }
 
 pub struct Queen;
 
 impl Gen for Queen {
-    fn dangers(pieces: BitBoard, occupation: BitBoard, _color: Color, dangers: &mut BitBoard) {
-        for piece in pieces {
-            *dangers +=
-                index::rook_slides(piece, occupation) + index::bishop_slides(piece, occupation);
-        }
-    }
+    const PIECE_KIND: PieceKind = PieceKind::Queen;
 
-    fn legal_moves(board: &Board, occupation: BitBoard, moves: &mut Moves) {
-        // One for cross-pinned queens
-        for queen in board.current_player.queens & board.current_player.pins.cross_pins() {
-            moves.extend(
-                ((index::rook_slides(queen, occupation) - board.current_player.occupation)
-                    & board.current_player.valid_targets
-                    & board.current_player.pins.cross_pins())
-                .bits()
-                .map(|target| Move {
-                    origin: queen,
-                    target,
-                    meta: MoveMeta::None,
-                    moved_piece_kind: PieceKind::Queen,
-                }),
-            );
-        }
-
-        // One for diagonally-pinned queens
-        for queen in board.current_player.queens & board.current_player.pins.diagonal_pins() {
-            moves.extend(
-                ((index::bishop_slides(queen, occupation) - board.current_player.occupation)
-                    & board.current_player.valid_targets
-                    & board.current_player.pins.diagonal_pins())
-                .bits()
-                .map(|target| Move {
-                    origin: queen,
-                    target,
-                    meta: MoveMeta::None,
-                    moved_piece_kind: PieceKind::Queen,
-                }),
-            );
-        }
-
-        // And one for unpinned queens
-        for queen in board.current_player.queens - board.current_player.pins.all() {
-            moves.extend(
-                ((index::rook_slides(queen, occupation) + index::bishop_slides(queen, occupation)
-                    - board.current_player.occupation)
-                    & board.current_player.valid_targets)
-                    .bits()
-                    .map(|target| Move {
-                        origin: queen,
-                        target,
-                        meta: MoveMeta::None,
-                        moved_piece_kind: PieceKind::Queen,
-                    }),
-            );
-        }
+    fn pseudo_legal_moves(
+        origin: Square,
+        friendly_occupation: BitBoard,
+        occupation: BitBoard,
+        _color: Color,
+    ) -> BitBoard {
+        index::rook_slides(origin, occupation) + index::bishop_slides(origin, occupation)
+            - friendly_occupation
     }
 }
 
 pub struct King;
 
 impl Gen for King {
-    fn dangers(pieces: BitBoard, _occupation: BitBoard, _color: Color, dangers: &mut BitBoard) {
-        *dangers += index::king_attacks(pieces.first_one_as_square());
+    const PIECE_KIND: PieceKind = PieceKind::King;
+
+    fn pseudo_legal_moves(
+        origin: Square,
+        friendly_occupation: BitBoard,
+        _occupation: BitBoard,
+        _color: Color,
+    ) -> BitBoard {
+        index::king_attacks(origin) - friendly_occupation
     }
 
-    fn legal_moves(board: &Board, occupation: BitBoard, moves: &mut Moves) {
-        let origin = board.current_player.king.first_one_as_square();
-        // Non castles
-        {
-            moves.extend(
-                (index::king_attacks(origin)
-                    - board.current_player.dangers
-                    - board.current_player.occupation)
-                    .bits()
-                    .map(|target| Move {
-                        origin,
-                        target,
-                        meta: MoveMeta::None,
-                        moved_piece_kind: PieceKind::King,
-                    }),
-            );
-        }
+    fn legal_moves(board: &Board, moves: &mut Moves) {
+        let king = board.current_player.king.try_into().unwrap();
+
+        moves.extend(
+            Self::pseudo_legal_moves(
+                king,
+                board.current_player.occupation,
+                board.occupation(),
+                board.current_color,
+            )
+            .bits()
+            .filter(|square| board.is_attacked(*square))
+            .map(|target| Move {
+                origin: king,
+                target,
+                promotion: None,
+            }),
+        );
 
         // Castles
-        if !board.current_player.is_in_check() {
-            if board.current_player.castling_rights.can_castle_ks()
-                && (BitBoard::ks_space(board.current_color)
-                    & (occupation + board.current_player.dangers))
-                    .is_empty()
+        if !board.in_check() {
+            let king_side_castle_mask = BitBoard::king_side_castle_mask(board.current_color);
+
+            if board.current_player.castling_rights.can_castle_king_side()
+                && (king_side_castle_mask & board.occupation()).is_empty()
+                && (king_side_castle_mask
+                    .bits()
+                    .all(|square| !board.is_attacked(square)))
             {
                 moves.push(Move {
                     origin,
@@ -416,15 +279,17 @@ impl Gen for King {
                         Color::White => Square::G1,
                         Color::Black => Square::G8,
                     },
-                    moved_piece_kind: PieceKind::King,
-                    meta: MoveMeta::CastleKs,
+                    promotion: None,
                 });
             }
 
-            if board.current_player.castling_rights.can_castle_qs()
-                && (BitBoard::qs_move_space(board.current_color) & occupation).is_empty()
-                && (BitBoard::qs_danger_space(board.current_color) & board.current_player.dangers)
-                    .is_empty()
+            if board.current_player.castling_rights.can_castle_queen_side()
+                && (BitBoard::queen_side_castle_occupation_mask(board.current_color)
+                    & board.occupation())
+                .is_empty()
+                && (BitBoard::queen_side_castle_attack_mask(board.current_color)
+                    .bits()
+                    .all(|square| !board.is_attacked(square)))
             {
                 moves.push(Move {
                     origin,
@@ -432,71 +297,25 @@ impl Gen for King {
                         Color::White => Square::C1,
                         Color::Black => Square::C8,
                     },
-                    moved_piece_kind: PieceKind::King,
-                    meta: MoveMeta::CastleQs,
+                    promotion: None,
                 });
             }
         }
     }
 }
 
-pub fn gen_dangers(board: &mut Board) {
-    board.current_player.dangers = BitBoard::EMPTY;
-    let occupation = (board.current_player.occupation + board.opposing_player.occupation)
-        - board.current_player.king;
-    let color = !board.current_color;
-
-    Pawn::dangers(
-        board.opposing_player.pawns,
-        occupation,
-        color,
-        &mut board.current_player.dangers,
-    );
-    Knight::dangers(
-        board.opposing_player.knights,
-        occupation,
-        color,
-        &mut board.current_player.dangers,
-    );
-    Bishop::dangers(
-        board.opposing_player.bishops,
-        occupation,
-        color,
-        &mut board.current_player.dangers,
-    );
-    Rook::dangers(
-        board.opposing_player.rooks,
-        occupation,
-        color,
-        &mut board.current_player.dangers,
-    );
-    Queen::dangers(
-        board.opposing_player.queens,
-        occupation,
-        color,
-        &mut board.current_player.dangers,
-    );
-    King::dangers(
-        board.opposing_player.king,
-        occupation,
-        color,
-        &mut board.current_player.dangers,
-    );
-}
-
 pub fn gen_moves(board: &Board) -> Moves {
     let mut moves = Moves::new();
-    let occupation = board.current_player.occupation + board.opposing_player.occupation;
 
-    if !board.current_player.king_must_move {
-        Pawn::legal_moves(board, occupation, &mut moves);
-        Knight::legal_moves(board, occupation, &mut moves);
-        Bishop::legal_moves(board, occupation, &mut moves);
-        Rook::legal_moves(board, occupation, &mut moves);
-        Queen::legal_moves(board, occupation, &mut moves);
+    if board.checkers.count_ones() < 2 {
+        Pawn::legal_moves(board, &mut moves);
+        Knight::legal_moves(board, &mut moves);
+        Bishop::legal_moves(board, &mut moves);
+        Rook::legal_moves(board, &mut moves);
+        Queen::legal_moves(board, &mut moves);
     }
 
-    King::legal_moves(board, occupation, &mut moves);
+    King::legal_moves(board, &mut moves);
 
     moves
 }

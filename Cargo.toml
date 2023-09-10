@@ -3,4 +3,4 @@ codegen-units = 1
 lto = true
 
 [workspace]
-members = ["hash-build", "hash-core", "hash-eval", "hash-search", "hash-cli"]
+members = ["hash-bootstrap", "hash-core", "hash-eval", "hash-search", "hash-cli"]

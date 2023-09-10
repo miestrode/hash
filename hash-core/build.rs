@@ -1,13 +1,17 @@
-use std::{env, fmt::Debug, fs, io::Error, path::PathBuf};
+use std::fs::{File, OpenOptions};
+use std::io::Write;
+use std::{any, array, env, fmt::Debug, io, io::Error, path::PathBuf};
 
-use hash_build::{bb, BitBoard, Color, Square, ZobristMap};
+use hash_bootstrap::{bb, BitBoard, Color, Square, ZobristMap};
 use rand::{rngs::StdRng, Rng, SeedableRng};
+
+const SEED: u64 = 0x73130172E6DEA605;
 
 // Used for updating the structure based on build flags.
 #[derive(Clone, Copy, Debug)]
-pub struct Metadata {
-    pub offset: usize,
-    pub mask: BitBoard,
+struct Metadata {
+    offset: usize,
+    mask: BitBoard,
     #[cfg(not(target_feature = "bmi2"))]
     pub magic: u64,
 }
@@ -27,7 +31,7 @@ const EDGES: BitBoard = bb!(
 
 // PERF: This is very slow, especially when used to spew out multiple rays, however, it doesn't
 // matter since this isn't used to actually generate rays during runtime
-pub fn gen_ray(
+fn gen_ray(
     pieces: BitBoard,
     blockers: BitBoard,
     update_fn: impl Fn(BitBoard) -> BitBoard,
@@ -49,10 +53,7 @@ pub fn gen_ray(
     }) - pieces
 }
 
-// This function returns each direction separately, as they are needed for
-// correct "gen_cross_index" edges and other things
-// NOTE: Blockers can be eaten
-pub fn gen_separated_cross_slides(
+fn gen_separated_cross_slides(
     pieces: BitBoard,
     blockers: BitBoard,
 ) -> (BitBoard, BitBoard, BitBoard, BitBoard) {
@@ -72,15 +73,13 @@ pub fn gen_separated_cross_slides(
     )
 }
 
-// NOTE: Blockers can be eaten
-pub fn gen_cross_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
+fn gen_cross_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
     let (up, right, down, left) = gen_separated_cross_slides(pieces, blockers);
 
     up + right + down + left
 }
 
-// NOTE: Blockers can be eaten
-pub fn gen_separated_diagonal_slides(
+fn gen_separated_diagonal_slides(
     pieces: BitBoard,
     blockers: BitBoard,
 ) -> (BitBoard, BitBoard, BitBoard, BitBoard) {
@@ -100,14 +99,13 @@ pub fn gen_separated_diagonal_slides(
     )
 }
 
-// NOTE: Blockers can be eaten
-pub fn gen_diagonal_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
+fn gen_diagonal_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
     let (up_left, up_right, down_right, down_left) =
         gen_separated_diagonal_slides(pieces, blockers);
     up_left + up_right + down_right + down_left
 }
 
-pub fn gen_knight_index(piece: BitBoard) -> BitBoard {
+fn gen_knight_index(piece: BitBoard) -> BitBoard {
     let top = piece.move_one_up(Color::White);
     let bottom = piece.move_one_down(Color::White);
     let left = piece.move_one_left(Color::White);
@@ -123,12 +121,12 @@ pub fn gen_knight_index(piece: BitBoard) -> BitBoard {
         + right.move_one_down_right(Color::White)
 }
 
-pub fn gen_king_index(piece: BitBoard) -> BitBoard {
+fn gen_king_index(piece: BitBoard) -> BitBoard {
     let line = piece.move_one_left(Color::White) + piece + piece.move_one_right(Color::White);
     line.move_one_up(Color::White) + line + line.move_one_down(Color::White) - piece
 }
 
-pub fn gen_cross_mask(piece: BitBoard) -> BitBoard {
+fn gen_cross_mask(piece: BitBoard) -> BitBoard {
     let (up, right, down, left) = gen_separated_cross_slides(piece, BitBoard::EMPTY);
     let correct_edges =
         (BitBoard::EDGE_FILES - (up + down)) + (BitBoard::EDGE_RANKS - (left + right));
@@ -137,35 +135,44 @@ pub fn gen_cross_mask(piece: BitBoard) -> BitBoard {
     up + right + down + left - correct_edges
 }
 
-pub fn gen_diagonal_mask(piece: BitBoard) -> BitBoard {
+fn gen_diagonal_mask(piece: BitBoard) -> BitBoard {
     gen_diagonal_slides(piece, BitBoard::EMPTY) - EDGES
 }
 
 fn gen_piece_table(move_fn: impl Fn(BitBoard) -> BitBoard) -> Vec<BitBoard> {
     Square::ALL
         .into_iter()
-        .map(|square| move_fn(square.as_bitboard()))
+        .map(|square| move_fn(square.into()))
         .collect()
 }
 
-fn stringify_table<T: Debug>(name: &'static str, data_type: &'static str, data: &[T]) -> String {
-    let mut output = format!("static {name}: [{data_type}; {}] = [", data.len());
+fn write_table<T: Debug>(name: &'static str, data: &[T], file: &mut File) -> io::Result<()> {
+    write!(
+        file,
+        "static {name}: [{}; {}] = [",
+        any::type_name::<T>(),
+        data.len()
+    )?;
 
     for element in data {
-        output.push_str(&format!("{element:?},"))
+        write!(file, "{element:?},")?;
     }
 
-    output.push_str("];");
-    output
+    write!(file, "];")
 }
 
-fn stringify_variable<T: Debug>(name: &'static str, data_type: &'static str, data: T) -> String {
-    format!("static {name}: {data_type} = {data:?};")
+fn write_variable<T: Debug>(name: &'static str, data: T, file: &mut File) -> io::Result<()> {
+    write!(file, "static {name}: {} = {data:?};", any::type_name::<T>(),)
 }
 
 fn main() -> Result<(), Error> {
+    let mut output_file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("out.rs"))?;
+
     #[cfg(target_feature = "bmi2")]
-    // If you can: use PEXT bitboards
     {
         // The first returned value is the raw data of the slide table. In order to properly index into it
         // however, the second returned value is needed. It contains a list of offsets for every single
@@ -183,7 +190,7 @@ fn main() -> Result<(), Error> {
             let mut raw_table = vec![];
 
             for square in Square::ALL {
-                let template = mask_fn(square.as_bitboard());
+                let template = mask_fn(square.into());
 
                 metadata[square] = Metadata {
                     offset,
@@ -192,7 +199,7 @@ fn main() -> Result<(), Error> {
 
                 let mut index = template
                     .subsets()
-                    .map(|subset| move_fn(square.as_bitboard(), subset))
+                    .map(|subset| move_fn(square.into(), subset))
                     .collect::<Vec<_>>();
 
                 offset += index.len();
@@ -202,57 +209,18 @@ fn main() -> Result<(), Error> {
             (raw_table, metadata)
         }
 
-        fn gen_separated_slide_table(
-            mask_fn: impl Fn(BitBoard) -> BitBoard,
-            move_fn: impl Fn(BitBoard, BitBoard) -> (BitBoard, BitBoard, BitBoard, BitBoard),
-        ) -> Vec<(BitBoard, BitBoard, BitBoard, BitBoard)> {
-            let mut raw_table = vec![];
-
-            for square in Square::ALL {
-                let template = mask_fn(square.as_bitboard());
-
-                let mut index = template
-                    .subsets()
-                    .map(|subset| move_fn(square.as_bitboard(), subset))
-                    .collect::<Vec<_>>();
-
-                raw_table.append(&mut index);
-            }
-
-            raw_table
-        }
-
-        let pext_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("pext.rs");
-
         let (cross_data, cross_meta) = gen_slide_table(gen_cross_mask, gen_cross_slides);
-        let separated_cross_data =
-            gen_separated_slide_table(gen_cross_mask, gen_separated_cross_slides);
         let (diagonal_data, diagonal_meta) =
             gen_slide_table(gen_diagonal_mask, gen_diagonal_slides);
-        let separated_diagonal_data =
-            gen_separated_slide_table(gen_diagonal_mask, gen_separated_diagonal_slides);
 
-        fs::write(
-            pext_file,
-            stringify_table("CROSS_SLIDES", "BitBoard", &cross_data)
-                + &stringify_table(
-                    "SEPARATED_CROSS_SLIDES",
-                    "(BitBoard, BitBoard, BitBoard, BitBoard)",
-                    &separated_cross_data,
-                )
-                + &stringify_table("CROSS_META", "Metadata", &cross_meta)
-                + &stringify_table("DIAGONAL_SLIDES", "BitBoard", &diagonal_data)
-                + &stringify_table(
-                    "SEPARATED_DIAGONAL_SLIDES",
-                    "(BitBoard, BitBoard, BitBoard, BitBoard)",
-                    &separated_diagonal_data,
-                )
-                + &stringify_table("DIAGONAL_META", "Metadata", &diagonal_meta),
-        )?;
+        write_table("CROSS_SLIDES", &cross_data, &mut output_file)?;
+        write_table("CROSS_META", &cross_meta, &mut output_file)?;
+
+        write_table("DIAGONAL_SLIDES", &diagonal_data, &mut output_file)?;
+        write_table("DIAGONAL_META", &diagonal_meta, &mut output_file)?;
     }
 
     #[cfg(not(target_feature = "bmi2"))]
-    // If you cannot: use magic bitboards
     {
         #[rustfmt::skip]
         let cross_metadata = [
@@ -391,12 +359,6 @@ fn main() -> Result<(), Error> {
         ];
 
         let mut table = [BitBoard::EMPTY; 88772];
-        let mut separated_table = [(
-            BitBoard::EMPTY,
-            BitBoard::EMPTY,
-            BitBoard::EMPTY,
-            BitBoard::EMPTY,
-        ); 88772];
 
         fn generate_table(
             metadata: [Metadata; 64],
@@ -418,77 +380,116 @@ fn main() -> Result<(), Error> {
             }
         }
 
-        fn generate_separated_table(
-            metadata: [Metadata; 64],
-            table: &mut [(BitBoard, BitBoard, BitBoard, BitBoard)],
-            shift: u32,
-            slide_fn: impl Fn(BitBoard, BitBoard) -> (BitBoard, BitBoard, BitBoard, BitBoard),
-        ) {
-            for square in Square::ALL {
-                let Metadata {
-                    mask,
-                    magic,
-                    offset,
-                } = metadata[square];
-
-                for subset in mask.subsets() {
-                    table[offset + (subset.0.wrapping_mul(magic) >> (64 - shift)) as usize] =
-                        slide_fn(square.as_bitboard(), subset);
-                }
-            }
-        }
-
         generate_table(cross_metadata, &mut table, 12, gen_cross_slides);
         generate_table(diagonal_metadata, &mut table, 9, gen_diagonal_slides);
 
-        generate_separated_table(
-            cross_metadata,
-            &mut separated_table,
-            12,
-            gen_separated_cross_slides,
-        );
-        generate_separated_table(
-            diagonal_metadata,
-            &mut separated_table,
-            9,
-            gen_separated_diagonal_slides,
-        );
-
-        let magic_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("magic.rs");
-
-        fs::write(
-            magic_file,
-            stringify_table("SLIDES", "BitBoard", &table)
-                + &stringify_table(
-                    "SEPARATED_SLIDES",
-                    "(BitBoard, BitBoard, BitBoard, BitBoard)",
-                    &separated_table,
-                )
-                + &stringify_table("CROSS_META", "Metadata", &cross_metadata)
-                + &stringify_table("DIAGONAL_META", "Metadata", &diagonal_metadata),
-        )?;
+        write_table("SLIDES", &table, &mut output_file)?;
+        write_table("CROSS_META", &cross_metadata, &mut output_file)?;
+        write_table("DIAGONAL_META", &diagonal_metadata, &mut output_file)?;
     }
 
-    let table_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("table.rs");
-
-    fs::write(
-        table_file,
-        stringify_table(
-            "KNIGHT_ATTACKS",
-            "BitBoard",
-            &gen_piece_table(gen_knight_index),
-        ) + &stringify_table("KING_ATTACKS", "BitBoard", &gen_piece_table(gen_king_index)),
+    write_table(
+        "KNIGHT_ATTACKS",
+        &gen_piece_table(gen_knight_index),
+        &mut output_file,
+    )?;
+    write_table(
+        "KING_ATTACKS",
+        &gen_piece_table(gen_king_index),
+        &mut output_file,
     )?;
 
-    let generic_output_file = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("out.rs");
+    write_table(
+        "WHITE_PAWN_ATTACKS",
+        &array::from_fn::<_, 64, _>(|index| {
+            let square: BitBoard = Square::try_from(index as u8).unwrap().into();
 
-    fs::write(
-        generic_output_file,
-        stringify_variable(
-            "ZOBRIST_MAP",
-            "ZobristMap",
-            StdRng::seed_from_u64(0x73130172E6DEA605).gen::<ZobristMap>(),
-        ),
+            square.move_one_up_left(Color::White) + square.move_one_up_right(Color::White)
+        }),
+        &mut output_file,
+    )?;
+
+    write_table(
+        "BLACK_PAWN_ATTACKS",
+        &array::from_fn::<_, 64, _>(|index| {
+            let square: BitBoard = Square::try_from(index as u8).unwrap().into();
+
+            square.move_one_up_left(Color::Black) + square.move_one_up_right(Color::Black)
+        }),
+        &mut output_file,
+    )?;
+
+    write_table(
+        "WHITE_PAWN_PUSHES",
+        &array::from_fn::<_, 64, _>(|index| {
+            let square = Square::try_from(index as u8).unwrap();
+            let square_as_bitboard: BitBoard = square.into();
+
+            square_as_bitboard.move_one_up(Color::White)
+                + if square.rank() == 1 {
+                    square_as_bitboard.move_two_up(Color::White)
+                } else {
+                    BitBoard::EMPTY
+                }
+        }),
+        &mut output_file,
+    )?;
+
+    write_table(
+        "BLACK_PAWN_PUSHES",
+        &array::from_fn::<_, 64, _>(|index| {
+            let square = Square::try_from(index as u8).unwrap();
+            let square_as_bitboard: BitBoard = square.into();
+
+            square_as_bitboard.move_one_up(Color::Black)
+                + if square.rank() == 6 {
+                    square_as_bitboard.move_two_up(Color::Black)
+                } else {
+                    BitBoard::EMPTY
+                }
+        }),
+        &mut output_file,
+    )?;
+
+    write_table(
+        "LINE",
+        &array::from_fn::<_, { 64 * 64 }, _>(|index| {
+            let first_square = Square::try_from((index / 64) as u8).unwrap();
+            let second_square = Square::try_from((index % 64) as u8).unwrap();
+
+            Square::ALL
+                .into_iter()
+                .filter(|&square| {
+                    square.on_line_with(first_square) && square.on_line_with(second_square)
+                })
+                .map(BitBoard::from)
+                .fold(BitBoard::EMPTY, |board, square| board + square.into())
+        }),
+        &mut output_file,
+    )?;
+
+    write_table(
+        "BETWEEN",
+        &array::from_fn::<_, { 64 * 64 }, _>(|index| {
+            let first_square = Square::try_from((index / 64) as u8).unwrap();
+            let second_square = Square::try_from((index % 64) as u8).unwrap();
+
+            Square::ALL
+                .into_iter()
+                .filter(|&square| {
+                    square.on_line_with(first_square)
+                        && square.on_line_with(second_square)
+                        && square.in_rectangle(first_square, second_square)
+                })
+                .fold(BitBoard::EMPTY, |board, square| board + square.into())
+        }),
+        &mut output_file,
+    )?;
+
+    write_variable(
+        "ZOBRIST_MAP",
+        StdRng::seed_from_u64(SEED).gen::<ZobristMap>(),
+        &mut output_file,
     )?;
 
     println!("cargo:rerun-if-changed=build.rs");

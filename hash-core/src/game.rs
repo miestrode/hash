@@ -7,12 +7,11 @@ use std::{
 use crate::{
     board::Board,
     cache::Cache,
-    index::{zobrist_castling_rights, zobrist_ep_file, zobrist_piece_table, zobrist_side},
     mg::{self},
-    repr::{ColoredPieceTable, EpData, Move, MoveMeta, Piece, PieceKind, Pins, Player},
+    repr::{ColoredPieceTable, EnPassantData, Move, MoveMetadata, Piece, PieceKind, Pins, Player},
 };
 
-use hash_build::{BitBoard, Color, Square};
+use hash_bootstrap::{BitBoard, Color, Square};
 
 pub enum Outcome {
     Win(Color),
@@ -27,7 +26,7 @@ struct RestorationData {
     opposing_pins: Pins,
     opposing_valid_targets: BitBoard,
     captured_piece_kind: Option<PieceKind>,
-    ep_data: Option<EpData>,
+    ep_data: Option<EnPassantData>,
     board_hash: u64,
     applied_move: Move,
     half_moves: u16, // This is the number of half moves since the last capture or pawn move
@@ -61,7 +60,7 @@ impl FromStr for Game {
                 "-" => None,
                 square => Some({
                     let capture_point = Square::from_str(square)?.as_bitboard();
-                    EpData {
+                    EnPassantData {
                         capture_point,
                         pawn: capture_point
                             .move_one_down(current_color)
@@ -130,7 +129,7 @@ impl FromStr for Game {
                 opposing_player,
                 current_color,
                 piece_table: colored_piece_table.uncolored(),
-                ep_data,
+                en_passant_data: ep_data,
                 // the FEN-string is assumed to be valid
                 hash: unsafe { zobrist_piece_table(&colored_piece_table) }
                     ^ zobrist_side(current_color)
@@ -202,19 +201,19 @@ impl Display for Game {
         {
             let mut castling_string = String::new();
 
-            if white.castling_rights.can_castle_ks() {
+            if white.castling_rights.can_castle_king_side() {
                 castling_string.push('K');
             }
 
-            if white.castling_rights.can_castle_qs() {
+            if white.castling_rights.can_castle_queen_side() {
                 castling_string.push('Q');
             }
 
-            if black.castling_rights.can_castle_ks() {
+            if black.castling_rights.can_castle_king_side() {
                 castling_string.push('k');
             }
 
-            if black.castling_rights.can_castle_qs() {
+            if black.castling_rights.can_castle_queen_side() {
                 castling_string.push('q');
             }
 
@@ -227,7 +226,7 @@ impl Display for Game {
 
         ' '.fmt(f)?;
 
-        if let Some(ep_data) = self.board.ep_data {
+        if let Some(ep_data) = self.board.en_passant_data {
             ep_data.capture_point.first_one_as_square().fmt(f)?;
         } else {
             '-'.fmt(f)?;
@@ -277,7 +276,7 @@ impl Game {
             // If the move is an en-passant, this isn't used, and so this need not be fully
             // accurate.
             captured_piece_kind: self.board.piece_table.piece_kind(chess_move.target),
-            ep_data: self.board.ep_data,
+            ep_data: self.board.en_passant_data,
             board_hash: self.board.hash,
             applied_move: *chess_move,
             half_moves: self.half_moves,
@@ -308,9 +307,9 @@ impl Game {
                 &mut self.board.current_player,
                 &mut self.board.opposing_player,
             );
-            self.board.ep_data = restoration_data.ep_data;
+            self.board.en_passant_data = restoration_data.ep_data;
 
-            if let MoveMeta::Promotion(piece_kind) = restoration_data.applied_move.meta {
+            if let MoveMetadata::Promotion(piece_kind) = restoration_data.applied_move.metadata {
                 self.board
                     .current_player
                     .toggle_piece(PieceKind::Pawn, restoration_data.applied_move.origin);
@@ -323,14 +322,14 @@ impl Game {
             } else {
                 unsafe {
                     self.board.current_player.move_piece_unchecked(
-                        restoration_data.applied_move.moved_piece_kind,
+                        restoration_data.applied_move.piece_kind,
                         restoration_data.applied_move.target,
                         restoration_data.applied_move.origin,
                     )
                 };
             }
 
-            if let MoveMeta::EnPassant = restoration_data.applied_move.meta {
+            if let MoveMetadata::EnPassant = restoration_data.applied_move.metadata {
                 if let Some(ep_data) = restoration_data.ep_data {
                     self.board
                         .opposing_player
@@ -356,8 +355,8 @@ impl Game {
             self.board.opposing_player.castling_rights.0[restoration_data.applied_move.target] =
                 restoration_data.opposing_target_castling_right;
 
-            match restoration_data.applied_move.meta {
-                MoveMeta::CastleKs => match self.board.current_color {
+            match restoration_data.applied_move.metadata {
+                MoveMetadata::CastleKingSide => match self.board.current_color {
                     Color::White => unsafe {
                         self.board.current_player.move_piece_unchecked(
                             PieceKind::Rook,
@@ -379,7 +378,7 @@ impl Game {
                             .move_piece(Square::F8, Square::TOP_RIGHT_ROOK);
                     },
                 },
-                MoveMeta::CastleQs => match self.board.current_color {
+                MoveMetadata::CastleQueenSide => match self.board.current_color {
                     Color::White => unsafe {
                         self.board.current_player.move_piece_unchecked(
                             PieceKind::Rook,

@@ -6,6 +6,8 @@ use std::{
 use crate::{BitBoard, Color, Square};
 
 #[derive(Eq, Hash, Debug, Clone, Copy, PartialEq)]
+/// Represents a type of piece, such as a [king](`PieceKind::King`),
+/// or a [queen](`PieceKind::Queen`).
 pub enum PieceKind {
     King,
     Queen,
@@ -16,7 +18,7 @@ pub enum PieceKind {
 }
 
 impl Display for PieceKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_char(match self {
             PieceKind::King => 'k',
             PieceKind::Queen => 'q',
@@ -28,11 +30,33 @@ impl Display for PieceKind {
     }
 }
 
+impl FromStr for PieceKind {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() == 1 {
+            Ok(match s[0] {
+                'k' => PieceKind::King,
+                'q' => PieceKind::Queen,
+                'r' => PieceKind::Rook,
+                'b' => PieceKind::Bishop,
+                'n' => PieceKind::Knight,
+                'p' => PieceKind::Pawn,
+                _ => return Err("Input must be a valid piece type character (k, q, r, b, n, p)"),
+            })
+        } else {
+            Err("Input must be a single character")
+        }
+    }
+}
+
 impl PieceKind {
+    /// An array of each piece a pawn can promote to.
     pub const PROMOTIONS: [Self; 4] = [Self::Queen, Self::Rook, Self::Bishop, Self::Knight];
 }
 
 #[derive(Clone, Copy)]
+/// Represents a Chess piece, which has a [type](`PieceKind`) and a [color](`Color`).
 pub struct Piece {
     pub kind: PieceKind,
     pub color: Color,
@@ -43,22 +67,27 @@ impl Piece {
         kind: PieceKind::Pawn,
         color: Color::White,
     };
+
     pub const WHITE_KNIGHT: Self = Self {
         kind: PieceKind::Knight,
         color: Color::White,
     };
+
     pub const WHITE_BISHOP: Self = Self {
         kind: PieceKind::Bishop,
         color: Color::White,
     };
+
     pub const WHITE_ROOK: Self = Self {
         kind: PieceKind::Rook,
         color: Color::White,
     };
+
     pub const WHITE_QUEEN: Self = Self {
         kind: PieceKind::Queen,
         color: Color::White,
     };
+
     pub const WHITE_KING: Self = Self {
         kind: PieceKind::King,
         color: Color::White,
@@ -68,22 +97,27 @@ impl Piece {
         kind: PieceKind::Pawn,
         color: Color::Black,
     };
+
     pub const BLACK_KNIGHT: Self = Self {
         kind: PieceKind::Knight,
         color: Color::Black,
     };
+
     pub const BLACK_BISHOP: Self = Self {
         kind: PieceKind::Bishop,
         color: Color::Black,
     };
+
     pub const BLACK_ROOK: Self = Self {
         kind: PieceKind::Rook,
         color: Color::Black,
     };
+
     pub const BLACK_QUEEN: Self = Self {
         kind: PieceKind::Queen,
         color: Color::Black,
     };
+
     pub const BLACK_KING: Self = Self {
         kind: PieceKind::King,
         color: Color::Black,
@@ -114,29 +148,20 @@ impl Display for Piece {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MoveMeta {
-    Promotion(PieceKind),
-    EnPassant,
-    DoublePush,
-    CastleKs,
-    CastleQs,
-    None,
-}
-
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
+/// Represents a move in the game of Chess. To create a move one can use [`Board::interpret_move`].
 pub struct Move {
-    pub origin: Square,
-    pub target: Square,
-    pub moved_piece_kind: PieceKind,
-    pub meta: MoveMeta,
+    pub(crate) origin: Square,
+    pub(crate) target: Square,
+    pub(crate) promotion: Option<PieceKind>,
 }
 
 impl Display for Move {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{}{}", self.origin, self.target))?;
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.origin.fmt(f)?;
+        self.target.fmt(f)?;
 
-        if let MoveMeta::Promotion(kind) = self.meta {
+        if let Some(kind) = self.promotion {
             kind.fmt(f)?;
         }
 
@@ -144,68 +169,50 @@ impl Display for Move {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Pins {
-    pub horizontal: BitBoard,
-    pub vertical: BitBoard,
-    pub diagonal: BitBoard,
-    pub anti_diagonal: BitBoard,
-}
+impl FromStr for Move {
+    type Err = &'static str;
 
-// TODO: Make sure all the of movement functions are cached
-impl Pins {
-    pub const EMPTY: Self = Self {
-        horizontal: BitBoard::EMPTY,
-        vertical: BitBoard::EMPTY,
-        diagonal: BitBoard::EMPTY,
-        anti_diagonal: BitBoard::EMPTY,
-    };
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() < 4 {
+            Err("Input too short")
+        } else if s.len() > 5 {
+            Err("Input too long")
+        } else {
+            let origin = Square::from_str(&s[0..2])?;
+            let target = Square::from_str(&s[2..4])?;
 
-    // Returns a bitboard for all pieces capable of psuedo-moving vertically
-    pub fn vertical_movement(&self) -> BitBoard {
-        !(self.horizontal + self.diagonal + self.anti_diagonal)
-    }
+            let promotion = if s.len() == 5 {
+                Some(PieceKind::from_str(&s[4..5])?)
+            } else {
+                None
+            };
 
-    pub fn diagonal_movement(&self) -> BitBoard {
-        !(self.horizontal + self.vertical + self.anti_diagonal)
-    }
-
-    pub fn anti_diagonal_movement(&self) -> BitBoard {
-        !(self.vertical + self.diagonal + self.horizontal)
-    }
-
-    pub fn all(&self) -> BitBoard {
-        self.vertical + self.horizontal + self.diagonal + self.anti_diagonal
-    }
-
-    pub fn cross_pins(&self) -> BitBoard {
-        self.vertical + self.horizontal
-    }
-
-    pub fn diagonal_pins(&self) -> BitBoard {
-        self.diagonal + self.anti_diagonal
+            Ok(Move {
+                origin,
+                target,
+                promotion,
+            })
+        }
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CastlingRights(pub [bool; 64]);
+pub(crate) struct CastlingRights(pub [bool; 64]);
 
 impl CastlingRights {
-    pub fn empty() -> Self {
-        let table = [false; 64];
-
-        Self(table)
+    pub(crate) fn empty() -> Self {
+        Self([false; 64])
     }
 
-    pub fn can_castle_ks(&self) -> bool {
+    pub(crate) fn can_castle_king_side(&self) -> bool {
         (self.0[Square::E1] ^ self.0[Square::E8]) && (self.0[Square::H1] ^ self.0[Square::H8])
     }
 
-    pub fn can_castle_qs(&self) -> bool {
+    pub(crate) fn can_castle_queen_side(&self) -> bool {
         (self.0[Square::E1] ^ self.0[Square::E8]) && (self.0[Square::A1] ^ self.0[Square::A8])
     }
 
-    pub fn as_minimized_rights(&self) -> usize {
+    pub(crate) fn as_minimized_rights(&self) -> usize {
         self.0[Square::A1] as usize
             | ((self.0[Square::H1] as usize) << 1)
             | ((self.0[Square::A8] as usize) << 2)
@@ -213,24 +220,20 @@ impl CastlingRights {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
-pub struct Player {
-    pub king: BitBoard,
-    pub queens: BitBoard,
-    pub rooks: BitBoard,
-    pub bishops: BitBoard,
-    pub knights: BitBoard,
-    pub pawns: BitBoard,
-    pub dangers: BitBoard,       // Positions the enemy king could be eaten at
-    pub valid_targets: BitBoard, // Valid target positions for moves. Used when at check
-    pub pins: Pins,
-    pub occupation: BitBoard, // All of the squares occupied by this player
-    pub king_must_move: bool, // A flag representing whether this turn, the king needs to move
-    pub castling_rights: CastlingRights,
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) struct Player {
+    pub(crate) king: BitBoard,
+    pub(crate) queens: BitBoard,
+    pub(crate) rooks: BitBoard,
+    pub(crate) bishops: BitBoard,
+    pub(crate) knights: BitBoard,
+    pub(crate) pawns: BitBoard,
+    pub(crate) occupation: BitBoard, // All of the squares occupied by this player
+    pub(crate) castling_rights: CastlingRights,
 }
 
 impl Player {
-    pub fn blank() -> Self {
+    pub(crate) fn blank() -> Self {
         Self {
             king: BitBoard::EMPTY,
             queens: BitBoard::EMPTY,
@@ -238,16 +241,23 @@ impl Player {
             bishops: BitBoard::EMPTY,
             knights: BitBoard::EMPTY,
             pawns: BitBoard::EMPTY,
-            dangers: BitBoard::EMPTY,
-            valid_targets: BitBoard::FULL,
-            pins: Pins::EMPTY,
             occupation: BitBoard::EMPTY,
-            king_must_move: false,
             castling_rights: CastlingRights::empty(),
         }
     }
 
-    pub fn piece_bitboard_mut(&mut self, kind: PieceKind) -> &mut BitBoard {
+    pub(crate) fn piece_bitboard(&self, kind: PieceKind) -> BitBoard {
+        match kind {
+            PieceKind::King => self.king,
+            PieceKind::Queen => self.queens,
+            PieceKind::Rook => self.rooks,
+            PieceKind::Bishop => self.bishops,
+            PieceKind::Knight => self.knights,
+            PieceKind::Pawn => self.pawns,
+        }
+    }
+
+    fn piece_bitboard_mut(&mut self, kind: PieceKind) -> &mut BitBoard {
         match kind {
             PieceKind::King => &mut self.king,
             PieceKind::Queen => &mut self.queens,
@@ -258,7 +268,12 @@ impl Player {
         }
     }
 
-    pub unsafe fn move_piece_unchecked(&mut self, kind: PieceKind, origin: Square, target: Square) {
+    pub(crate) unsafe fn move_piece_unchecked(
+        &mut self,
+        kind: PieceKind,
+        origin: Square,
+        target: Square,
+    ) {
         let pieces = self.piece_bitboard_mut(kind);
         pieces.toggle_bit(origin);
         pieces.toggle_bit(target);
@@ -267,23 +282,17 @@ impl Player {
         self.occupation.toggle_bit(target);
     }
 
-    pub fn toggle_piece(&mut self, kind: PieceKind, square: Square) {
+    pub(crate) fn toggle_piece(&mut self, kind: PieceKind, square: Square) {
         self.piece_bitboard_mut(kind).toggle_bit(square);
         self.occupation.toggle_bit(square);
     }
 
-    pub fn is_in_check(&self) -> bool {
+    pub(crate) fn is_in_check(&self) -> bool {
         !self.valid_targets.is_full()
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct EpData {
-    pub capture_point: BitBoard,
-    pub pawn: Square,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PieceTable(pub [Option<PieceKind>; 64]);
 
 impl PieceTable {

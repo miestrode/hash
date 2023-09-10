@@ -7,7 +7,7 @@ pub mod index;
 pub mod mg;
 pub mod repr;
 
-pub use hash_build::*;
+pub use hash_bootstrap::*;
 
 #[cfg(test)]
 mod tests {
