@@ -125,9 +125,9 @@ impl FromStr for Game {
             };
 
             let board = Board {
-                current_player,
-                opposing_player,
-                current_color,
+                us: current_player,
+                them: opposing_player,
+                playing_color: current_color,
                 piece_table: colored_piece_table.uncolored(),
                 en_passant_data: ep_data,
                 // the FEN-string is assumed to be valid
@@ -163,7 +163,7 @@ impl Display for Game {
 
                 for row in 0..8 {
                     let square = Square(column * 8 + row);
-                    let piece = self.board.get_piece(square);
+                    let piece = self.board.piece(square);
 
                     if let Some(piece) = piece {
                         if spacing != 0 {
@@ -189,13 +189,13 @@ impl Display for Game {
 
         ' '.fmt(f)?;
 
-        self.board.current_color.fmt(f)?;
+        self.board.playing_color.fmt(f)?;
 
         ' '.fmt(f)?;
 
-        let (white, black) = match self.board.current_color {
-            Color::White => (self.board.current_player, self.board.opposing_player),
-            Color::Black => (self.board.opposing_player, self.board.current_player),
+        let (white, black) = match self.board.playing_color {
+            Color::White => (self.board.us, self.board.them),
+            Color::Black => (self.board.them, self.board.us),
         };
 
         {
@@ -266,13 +266,11 @@ impl Game {
     // SAFETY: The move is assumed to be legal
     pub unsafe fn make_move_unchecked(&mut self, chess_move: &Move) {
         self.restoration_data.push(RestorationData {
-            current_origin_castling_right: self.board.current_player.castling_rights.0
-                [chess_move.origin],
-            opposing_target_castling_right: self.board.opposing_player.castling_rights.0
-                [chess_move.target],
-            opposing_king_must_move: self.board.opposing_player.king_must_move,
-            opposing_pins: self.board.opposing_player.pins,
-            opposing_valid_targets: self.board.opposing_player.valid_targets,
+            current_origin_castling_right: self.board.us.castling_rights.0[chess_move.origin],
+            opposing_target_castling_right: self.board.them.castling_rights.0[chess_move.target],
+            opposing_king_must_move: self.board.them.king_must_move,
+            opposing_pins: self.board.them.pins,
+            opposing_valid_targets: self.board.them.valid_targets,
             // If the move is an en-passant, this isn't used, and so this need not be fully
             // accurate.
             captured_piece_kind: self.board.piece_table.piece_kind(chess_move.target),
@@ -302,26 +300,23 @@ impl Game {
                 restoration_data.applied_move.target,
                 restoration_data.applied_move.origin,
             );
-            self.board.current_color = !self.board.current_color;
-            mem::swap(
-                &mut self.board.current_player,
-                &mut self.board.opposing_player,
-            );
+            self.board.playing_color = !self.board.playing_color;
+            mem::swap(&mut self.board.us, &mut self.board.them);
             self.board.en_passant_data = restoration_data.ep_data;
 
             if let MoveMetadata::Promotion(piece_kind) = restoration_data.applied_move.metadata {
                 self.board
-                    .current_player
+                    .us
                     .toggle_piece(PieceKind::Pawn, restoration_data.applied_move.origin);
                 self.board
-                    .current_player
+                    .us
                     .toggle_piece(piece_kind, restoration_data.applied_move.target);
                 self.board
                     .piece_table
                     .set(Some(PieceKind::Pawn), restoration_data.applied_move.origin);
             } else {
                 unsafe {
-                    self.board.current_player.move_piece_unchecked(
+                    self.board.us.move_piece_unchecked(
                         restoration_data.applied_move.piece_kind,
                         restoration_data.applied_move.target,
                         restoration_data.applied_move.origin,
@@ -331,9 +326,7 @@ impl Game {
 
             if let MoveMetadata::EnPassant = restoration_data.applied_move.metadata {
                 if let Some(ep_data) = restoration_data.ep_data {
-                    self.board
-                        .opposing_player
-                        .toggle_piece(PieceKind::Pawn, ep_data.pawn);
+                    self.board.them.toggle_piece(PieceKind::Pawn, ep_data.pawn);
                     self.board
                         .piece_table
                         .set(Some(PieceKind::Pawn), ep_data.pawn);
@@ -342,7 +335,7 @@ impl Game {
                 }
             } else if let Some(piece_kind) = restoration_data.captured_piece_kind {
                 self.board
-                    .opposing_player
+                    .them
                     .toggle_piece(piece_kind, restoration_data.applied_move.target);
                 self.board.piece_table.set(
                     restoration_data.captured_piece_kind,
@@ -350,15 +343,15 @@ impl Game {
                 );
             }
 
-            self.board.current_player.castling_rights.0[restoration_data.applied_move.origin] =
+            self.board.us.castling_rights.0[restoration_data.applied_move.origin] =
                 restoration_data.current_origin_castling_right;
-            self.board.opposing_player.castling_rights.0[restoration_data.applied_move.target] =
+            self.board.them.castling_rights.0[restoration_data.applied_move.target] =
                 restoration_data.opposing_target_castling_right;
 
             match restoration_data.applied_move.metadata {
-                MoveMetadata::CastleKingSide => match self.board.current_color {
+                MoveMetadata::CastleKingSide => match self.board.playing_color {
                     Color::White => unsafe {
-                        self.board.current_player.move_piece_unchecked(
+                        self.board.us.move_piece_unchecked(
                             PieceKind::Rook,
                             Square::F1,
                             Square::BOTTOM_RIGHT_ROOK,
@@ -368,7 +361,7 @@ impl Game {
                             .move_piece(Square::F1, Square::BOTTOM_RIGHT_ROOK);
                     },
                     Color::Black => unsafe {
-                        self.board.current_player.move_piece_unchecked(
+                        self.board.us.move_piece_unchecked(
                             PieceKind::Rook,
                             Square::F8,
                             Square::TOP_RIGHT_ROOK,
@@ -378,9 +371,9 @@ impl Game {
                             .move_piece(Square::F8, Square::TOP_RIGHT_ROOK);
                     },
                 },
-                MoveMetadata::CastleQueenSide => match self.board.current_color {
+                MoveMetadata::CastleQueenSide => match self.board.playing_color {
                     Color::White => unsafe {
-                        self.board.current_player.move_piece_unchecked(
+                        self.board.us.move_piece_unchecked(
                             PieceKind::Rook,
                             Square::D1,
                             Square::BOTTOM_LEFT_ROOK,
@@ -390,7 +383,7 @@ impl Game {
                             .move_piece(Square::D1, Square::BOTTOM_LEFT_ROOK);
                     },
                     Color::Black => unsafe {
-                        self.board.current_player.move_piece_unchecked(
+                        self.board.us.move_piece_unchecked(
                             PieceKind::Rook,
                             Square::D8,
                             Square::TOP_LEFT_ROOK,
@@ -403,9 +396,9 @@ impl Game {
                 _ => {}
             }
 
-            self.board.opposing_player.king_must_move = restoration_data.opposing_king_must_move;
-            self.board.opposing_player.pins = restoration_data.opposing_pins;
-            self.board.opposing_player.valid_targets = restoration_data.opposing_valid_targets;
+            self.board.them.king_must_move = restoration_data.opposing_king_must_move;
+            self.board.them.pins = restoration_data.opposing_pins;
+            self.board.them.valid_targets = restoration_data.opposing_valid_targets;
 
             // TODO:: Add utility methods to the cache API, to make this code nicer
             if let Some(value) = self.repetition_cache.get(&self.board) {
@@ -426,8 +419,8 @@ impl Game {
         if mg::gen_moves(&self.board).is_empty() {
             // If a player is in check, he is attacked and so this is mate. The player who is
             // moving thus lost
-            if self.board.current_player.is_in_check() {
-                Some(Outcome::Win(self.board.current_color))
+            if self.board.us.is_in_check() {
+                Some(Outcome::Win(self.board.playing_color))
             } else {
                 // Otherwise, it's stalemate
                 Some(Outcome::Draw)

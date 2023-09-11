@@ -1,16 +1,21 @@
 use arrayvec::ArrayVec;
 use hash_bootstrap::{BitBoard, Color, Square};
 
+use crate::repr::Piece;
 use crate::{
     board::Board,
     index,
     repr::{Move, PieceKind},
 };
 
+/// The maximum number of moves stored by [`Moves`]. This shouldn't be relevant for most
+/// cases - simply use [`Moves`].
 pub const MOVES: usize = 218;
+
+/// An array of moves that is the output of move generation ([`mg::gen_moves`]).
 pub type Moves = ArrayVec<Move, MOVES>;
 
-pub(crate) trait Gen {
+trait Gen {
     const PIECE_KIND: PieceKind;
 
     fn pseudo_legal_moves(
@@ -20,9 +25,9 @@ pub(crate) trait Gen {
         color: Color,
     ) -> BitBoard;
     fn legal_moves(board: &Board, moves: &mut Moves) {
-        let pieces = *board.current_player.piece_bitboard(Self::PIECE_KIND);
+        let pieces = board.us.piece_bitboard(Self::PIECE_KIND);
         let occupation = board.occupation();
-        let king_square = board.current_player.king.try_into().unwrap();
+        let king_square = board.us.king.try_into().unwrap();
         let valid_targets = if board.in_check() {
             // NOTE: If this code was invoked there is a single checker. If it isn't a sliding piece
             // there won't be a line between the checker and the king (except for pawns, but in this
@@ -35,38 +40,32 @@ pub(crate) trait Gen {
             BitBoard::FULL
         };
 
-        for piece in (pieces - board.current_player.pinned).bits() {
-            for target in Self::pseudo_legal_moves(
-                piece,
-                board.current_player.occupation,
-                occupation,
-                board.current_color,
-            ) & valid_targets
-            {
-                moves.push(Move {
+        moves.extend((pieces - board.pinned).bits().flat_map(|piece| {
+            (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
+                & valid_targets)
+                .bits()
+                .map(|target| Move {
                     origin: piece,
                     target,
                     promotion: None,
-                });
-            }
-        }
+                })
+        }));
 
         if !board.in_check() {
-            for piece in (pieces & board.current_player.pinned).bits() {
-                for target in Self::pseudo_legal_moves(
+            moves.extend((pieces & board.pinned).bits().flat_map(|piece| {
+                (Self::pseudo_legal_moves(
                     piece,
-                    board.current_player.occupation,
+                    board.us.occupation,
                     occupation,
-                    board.current_color,
-                ) & index::line_fit(king_square, piece)
-                {
-                    moves.push(Move {
-                        origin: piece,
-                        target,
-                        promotion: None,
-                    });
-                }
-            }
+                    board.playing_color,
+                ) & index::line_fit(king_square, piece))
+                .bits()
+                .map(|target| Move {
+                    origin: piece,
+                    target,
+                    promotion: None,
+                })
+            }));
         }
     }
 }
@@ -74,7 +73,7 @@ pub(crate) trait Gen {
 pub struct Pawn;
 
 impl Pawn {
-    unsafe fn is_legal_ep_capture(
+    unsafe fn is_legal_en_passant_capture(
         board: &Board,
         mut occupation: BitBoard,
         en_passant_pawn: Square,
@@ -83,16 +82,14 @@ impl Pawn {
         // Update board to it's post capture state
         occupation.toggle_bit(origin);
         occupation
-            .toggle_bit(unsafe { en_passant_pawn.move_one_up_unchecked(board.current_color) });
+            .toggle_bit(unsafe { en_passant_pawn.move_one_up_unchecked(board.playing_color) });
         occupation.toggle_bit(en_passant_pawn);
 
-        let king = board.current_player.king.try_into().unwrap();
+        let king = board.us.king.try_into().unwrap();
 
         // Test for any rays hitting the king
-        ((index::bishop_slides(king, occupation)
-            & (board.opposing_player.queens + board.opposing_player.bishops))
-            + (index::rook_slides(king, occupation)
-                & (board.opposing_player.queens + board.opposing_player.rooks)))
+        ((index::bishop_slides(king, occupation) & (board.them.queens + board.them.bishops))
+            + (index::rook_slides(king, occupation) & (board.them.queens + board.them.rooks)))
             .is_empty()
     }
 }
@@ -116,7 +113,7 @@ impl Gen for Pawn {
 
     fn legal_moves(board: &Board, moves: &mut Moves) {
         let occupation = board.occupation();
-        let king_square = board.current_player.king.try_into().unwrap();
+        let king_square = board.us.king.try_into().unwrap();
         let valid_targets = if board.in_check() {
             // NOTE: If this code was invoked there is a single checker. If it isn't a sliding piece
             // there won't be a line between the checker and the king (except for pawns, but in this
@@ -129,8 +126,62 @@ impl Gen for Pawn {
             BitBoard::FULL
         };
 
-        for pawn in (board.current_player.pawns - board.pinned).bits() {
-            pawn.move_one_up_
+        moves.extend((board.us.pawns - board.pinned).bits().flat_map(|piece| {
+            (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
+                & valid_targets)
+                .bits()
+                .map(|target| Move {
+                    origin: piece,
+                    target,
+                    promotion: None,
+                })
+        }));
+
+        if !board.in_check() {
+            moves.extend((board.us.pawns & board.pinned).bits().flat_map(|piece| {
+                (Self::pseudo_legal_moves(
+                    piece,
+                    board.us.occupation,
+                    occupation,
+                    board.playing_color,
+                ) & index::line_fit(king_square, piece))
+                .bits()
+                .map(|target| Move {
+                    origin: piece,
+                    target,
+                    promotion: None,
+                })
+            }));
+        }
+
+        unsafe {
+            if let Some(en_passant_square) = board.en_passant_square {
+                let left_origin =
+                    en_passant_square.move_one_down_left_unchecked(board.playing_color);
+                let right_origin =
+                    en_passant_square.move_one_down_right_unchecked(board.playing_color);
+
+                let correct_pawn = Some(Piece {
+                    color: board.playing_color,
+                    kind: PieceKind::Pawn,
+                });
+
+                if correct_pawn == board.piece(left_origin) {
+                    moves.push(Move {
+                        origin: left_origin,
+                        target: en_passant_square.move_one_up_unchecked(board.playing_color),
+                        promotion: None,
+                    });
+                }
+
+                if correct_pawn == board.piece(right_origin) {
+                    moves.push(Move {
+                        origin: right_origin,
+                        target: en_passant_square.move_one_up_unchecked(board.playing_color),
+                        promotion: None,
+                    });
+                }
+            }
         }
     }
 }
@@ -153,7 +204,7 @@ impl Gen for Knight {
     // pieces, as a pinned knight cannot move.
     fn legal_moves(board: &Board, moves: &mut Moves) {
         let occupation = board.occupation();
-        let king_square = board.current_player.king.try_into().unwrap();
+        let king_square = board.us.king.try_into().unwrap();
         let valid_targets = if board.in_check() {
             // NOTE: If this code was invoked there is a single checker. If it isn't a sliding piece
             // there won't be a line between the checker and the king (except for pawns, but in this
@@ -166,21 +217,16 @@ impl Gen for Knight {
             BitBoard::FULL
         };
 
-        for piece in (board.current_player.knights - board.current_player.pinned).bits() {
-            for target in Self::pseudo_legal_moves(
-                piece,
-                board.current_player.occupation,
-                occupation,
-                board.current_color,
-            ) & valid_targets
-            {
-                moves.push(Move {
+        moves.extend((board.us.knights - board.pinned).bits().flat_map(|piece| {
+            (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
+                & valid_targets)
+                .bits()
+                .map(|target| Move {
                     origin: piece,
                     target,
                     promotion: None,
-                });
-            }
-        }
+                })
+        }));
     }
 }
 
@@ -245,14 +291,14 @@ impl Gen for King {
     }
 
     fn legal_moves(board: &Board, moves: &mut Moves) {
-        let king = board.current_player.king.try_into().unwrap();
+        let king = board.us.king.try_into().unwrap();
 
         moves.extend(
             Self::pseudo_legal_moves(
                 king,
-                board.current_player.occupation,
+                board.us.occupation,
                 board.occupation(),
-                board.current_color,
+                board.playing_color,
             )
             .bits()
             .filter(|square| board.is_attacked(*square))
@@ -265,17 +311,17 @@ impl Gen for King {
 
         // Castles
         if !board.in_check() {
-            let king_side_castle_mask = BitBoard::king_side_castle_mask(board.current_color);
+            let king_side_castle_mask = BitBoard::king_side_castle_mask(board.playing_color);
 
-            if board.current_player.castling_rights.can_castle_king_side()
+            if board.us.castling_rights.can_castle_king_side()
                 && (king_side_castle_mask & board.occupation()).is_empty()
                 && (king_side_castle_mask
                     .bits()
                     .all(|square| !board.is_attacked(square)))
             {
                 moves.push(Move {
-                    origin,
-                    target: match board.current_color {
+                    origin: king,
+                    target: match board.playing_color {
                         Color::White => Square::G1,
                         Color::Black => Square::G8,
                     },
@@ -283,17 +329,17 @@ impl Gen for King {
                 });
             }
 
-            if board.current_player.castling_rights.can_castle_queen_side()
-                && (BitBoard::queen_side_castle_occupation_mask(board.current_color)
+            if board.us.castling_rights.can_castle_queen_side()
+                && (BitBoard::queen_side_castle_occupation_mask(board.playing_color)
                     & board.occupation())
                 .is_empty()
-                && (BitBoard::queen_side_castle_attack_mask(board.current_color)
+                && (BitBoard::queen_side_castle_attack_mask(board.playing_color)
                     .bits()
                     .all(|square| !board.is_attacked(square)))
             {
                 moves.push(Move {
-                    origin,
-                    target: match board.current_color {
+                    origin: king,
+                    target: match board.playing_color {
                         Color::White => Square::C1,
                         Color::Black => Square::C8,
                     },
@@ -304,8 +350,10 @@ impl Gen for King {
     }
 }
 
-pub fn gen_moves(board: &Board) -> Moves {
+pub(crate) fn gen_moves(board: &Board) -> Moves {
     let mut moves = Moves::new();
+
+    King::legal_moves(board, &mut moves);
 
     if board.checkers.count_ones() < 2 {
         Pawn::legal_moves(board, &mut moves);
@@ -314,8 +362,6 @@ pub fn gen_moves(board: &Board) -> Moves {
         Rook::legal_moves(board, &mut moves);
         Queen::legal_moves(board, &mut moves);
     }
-
-    King::legal_moves(board, &mut moves);
 
     moves
 }

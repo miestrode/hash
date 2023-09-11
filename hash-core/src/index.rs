@@ -248,10 +248,10 @@ pub fn pawn_moves(
 
     match color {
         Color::White => {
-            WHITE_PAWN_ATTACKS[origin] & enemy_blockers + WHITE_PAWN_PUSHES[origin] - smear
+            (WHITE_PAWN_ATTACKS[origin] & enemy_blockers) + WHITE_PAWN_PUSHES[origin] - smear
         }
         Color::Black => {
-            BLACK_PAWN_ATTACKS[origin] & enemy_blockers + BLACK_PAWN_PUSHES[origin] - smear
+            (BLACK_PAWN_ATTACKS[origin] & enemy_blockers) + BLACK_PAWN_PUSHES[origin] - smear
         }
     }
 }
@@ -289,7 +289,7 @@ pub fn pawn_moves(
 /// Note that the `X`s represent the squares, and would generally have `1`s on them
 /// (except in cases where there is no line fit).
 pub fn line_fit(a: Square, b: Square) -> BitBoard {
-    LINE[a * 64 + b]
+    LINE[a.as_index() * 64 + b.as_index()]
 }
 
 /// Returns a bitboard consisting of the connecting line between the two squares passed,
@@ -325,7 +325,7 @@ pub fn line_fit(a: Square, b: Square) -> BitBoard {
 /// Note that the `X`s represent the forming squares themselves, and these would never have `1`s
 /// in them, as the line doesn't include its edge points.
 pub fn line_between(a: Square, b: Square) -> BitBoard {
-    BETWEEN[a * 64 + b]
+    BETWEEN[a.as_index() * 64 + b.as_index()]
 }
 
 /// Contains a variety of functions for generating Zobrist hashes for different parts of a board.

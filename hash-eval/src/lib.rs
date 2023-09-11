@@ -14,6 +14,6 @@ pub struct BasicEvaluator;
 
 impl Eval for BasicEvaluator {
     fn eval(&self, board: &Board) -> Score {
-        Score::from_evaluation(material(board.current_player) - material(board.opposing_player))
+        Score::from_evaluation(material(board.us) - material(board.them))
     }
 }

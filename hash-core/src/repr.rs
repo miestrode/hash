@@ -35,13 +35,13 @@ impl FromStr for PieceKind {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() == 1 {
-            Ok(match s[0] {
-                'k' => PieceKind::King,
-                'q' => PieceKind::Queen,
-                'r' => PieceKind::Rook,
-                'b' => PieceKind::Bishop,
-                'n' => PieceKind::Knight,
-                'p' => PieceKind::Pawn,
+            Ok(match &s[0..1] {
+                "k" => PieceKind::King,
+                "q" => PieceKind::Queen,
+                "r" => PieceKind::Rook,
+                "b" => PieceKind::Bishop,
+                "n" => PieceKind::Knight,
+                "p" => PieceKind::Pawn,
                 _ => return Err("Input must be a valid piece type character (k, q, r, b, n, p)"),
             })
         } else {
@@ -55,7 +55,7 @@ impl PieceKind {
     pub const PROMOTIONS: [Self; 4] = [Self::Queen, Self::Rook, Self::Bishop, Self::Knight];
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 /// Represents a Chess piece, which has a [type](`PieceKind`) and a [color](`Color`).
 pub struct Piece {
     pub kind: PieceKind,
@@ -256,61 +256,19 @@ impl Player {
             PieceKind::Pawn => self.pawns,
         }
     }
-
-    fn piece_bitboard_mut(&mut self, kind: PieceKind) -> &mut BitBoard {
-        match kind {
-            PieceKind::King => &mut self.king,
-            PieceKind::Queen => &mut self.queens,
-            PieceKind::Rook => &mut self.rooks,
-            PieceKind::Bishop => &mut self.bishops,
-            PieceKind::Knight => &mut self.knights,
-            PieceKind::Pawn => &mut self.pawns,
-        }
-    }
-
-    pub(crate) unsafe fn move_piece_unchecked(
-        &mut self,
-        kind: PieceKind,
-        origin: Square,
-        target: Square,
-    ) {
-        let pieces = self.piece_bitboard_mut(kind);
-        pieces.toggle_bit(origin);
-        pieces.toggle_bit(target);
-
-        self.occupation.toggle_bit(origin);
-        self.occupation.toggle_bit(target);
-    }
-
-    pub(crate) fn toggle_piece(&mut self, kind: PieceKind, square: Square) {
-        self.piece_bitboard_mut(kind).toggle_bit(square);
-        self.occupation.toggle_bit(square);
-    }
-
-    pub(crate) fn is_in_check(&self) -> bool {
-        !self.valid_targets.is_full()
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct PieceTable(pub [Option<PieceKind>; 64]);
+pub(crate) struct PieceTable([Option<PieceKind>; 64]);
 
 impl PieceTable {
-    pub fn move_piece(&mut self, origin: Square, target: Square) {
-        self.0.swap(origin.as_index(), target.as_index());
-        self.set(None, origin);
-    }
-
-    pub fn piece_kind(&self, square: Square) -> Option<PieceKind> {
+    pub(crate) fn piece_kind(&self, square: Square) -> Option<PieceKind> {
         self.0[square]
-    }
-
-    pub fn set(&mut self, kind: Option<PieceKind>, square: Square) {
-        self.0[square] = kind;
     }
 }
 
-pub struct ColoredPieceTable(pub [Option<Piece>; 64]);
+#[derive(Clone, Copy)]
+pub struct ColoredPieceTable([Option<Piece>; 64]);
 
 impl ColoredPieceTable {
     pub const EMPTY: Self = Self([None; 64]);

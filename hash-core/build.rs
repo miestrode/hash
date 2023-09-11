@@ -9,6 +9,7 @@ const SEED: u64 = 0x73130172E6DEA605;
 
 // Used for updating the structure based on build flags.
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 struct Metadata {
     offset: usize,
     mask: BitBoard,
@@ -463,7 +464,7 @@ fn main() -> Result<(), Error> {
                     square.on_line_with(first_square) && square.on_line_with(second_square)
                 })
                 .map(BitBoard::from)
-                .fold(BitBoard::EMPTY, |board, square| board + square.into())
+                .fold(BitBoard::EMPTY, |board, square| board + square)
         }),
         &mut output_file,
     )?;
