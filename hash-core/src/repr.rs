@@ -218,6 +218,10 @@ impl CastlingRights {
             | ((self.0[Square::A8] as usize) << 2)
             | ((self.0[Square::H8] as usize) << 3)
     }
+
+    pub(crate) fn revoke(&mut self, square: Square) {
+        self.0[square] = false;
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -246,6 +250,17 @@ impl Player {
         }
     }
 
+    fn piece_bitboard_mut(&mut self, kind: PieceKind) -> &mut BitBoard {
+        match kind {
+            PieceKind::King => &mut self.king,
+            PieceKind::Queen => &mut self.queens,
+            PieceKind::Rook => &mut self.rooks,
+            PieceKind::Bishop => &mut self.bishops,
+            PieceKind::Knight => &mut self.knights,
+            PieceKind::Pawn => &mut self.pawns,
+        }
+    }
+
     pub(crate) fn piece_bitboard(&self, kind: PieceKind) -> BitBoard {
         match kind {
             PieceKind::King => self.king,
@@ -256,6 +271,11 @@ impl Player {
             PieceKind::Pawn => self.pawns,
         }
     }
+
+    pub(crate) fn toggle_piece(&mut self, square: Square, kind: PieceKind) {
+        self.occupation.toggle_bit(square);
+        self.piece_bitboard_mut(kind).toggle_bit(square);
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -265,15 +285,23 @@ impl PieceTable {
     pub(crate) fn piece_kind(&self, square: Square) -> Option<PieceKind> {
         self.0[square]
     }
+
+    pub(crate) fn set(&mut self, square: Square, piece: Option<PieceKind>) {
+        self.0[square] = piece;
+    }
 }
 
 #[derive(Clone, Copy)]
-pub struct ColoredPieceTable([Option<Piece>; 64]);
+pub(crate) struct ColoredPieceTable([Option<Piece>; 64]);
 
 impl ColoredPieceTable {
-    pub const EMPTY: Self = Self([None; 64]);
+    pub(crate) const EMPTY: Self = Self([None; 64]);
 
-    pub fn uncolored(&self) -> PieceTable {
+    pub(crate) fn pieces(&self) -> &[Option<Piece>; 64] {
+        &self.0
+    }
+
+    pub(crate) fn uncolored(&self) -> PieceTable {
         PieceTable(
             self.0
                 .into_iter()

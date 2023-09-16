@@ -1,6 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::{any, array, env, fmt::Debug, io, io::Error, path::PathBuf};
+use std::{array, env, fmt::Debug, io, io::Error, path::PathBuf};
 
 use hash_bootstrap::{bb, BitBoard, Color, Square, ZobristMap};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -147,11 +147,10 @@ fn gen_piece_table(move_fn: impl Fn(BitBoard) -> BitBoard) -> Vec<BitBoard> {
         .collect()
 }
 
-fn write_table<T: Debug>(name: &'static str, data: &[T], file: &mut File) -> io::Result<()> {
+fn write_table<T: Debug>(name: &'static str, data: &[T], type_name: &'static str, file: &mut File) -> io::Result<()> {
     write!(
         file,
-        "static {name}: [{}; {}] = [",
-        any::type_name::<T>(),
+        "static {name}: [{type_name}; {}] = [",
         data.len()
     )?;
 
@@ -162,8 +161,8 @@ fn write_table<T: Debug>(name: &'static str, data: &[T], file: &mut File) -> io:
     write!(file, "];")
 }
 
-fn write_variable<T: Debug>(name: &'static str, data: T, file: &mut File) -> io::Result<()> {
-    write!(file, "static {name}: {} = {data:?};", any::type_name::<T>(),)
+fn write_variable<T: Debug>(name: &'static str, data: T, type_name: &'static str, file: &mut File) -> io::Result<()> {
+    write!(file, "static {name}: {type_name} = {data:?};")
 }
 
 fn main() -> Result<(), Error> {
@@ -214,11 +213,11 @@ fn main() -> Result<(), Error> {
         let (diagonal_data, diagonal_meta) =
             gen_slide_table(gen_diagonal_mask, gen_diagonal_slides);
 
-        write_table("CROSS_SLIDES", &cross_data, &mut output_file)?;
-        write_table("CROSS_META", &cross_meta, &mut output_file)?;
+        write_table("CROSS_SLIDES", &cross_data, "BitBoard", &mut output_file)?;
+        write_table("CROSS_META", &cross_meta, "Metadata", &mut output_file)?;
 
-        write_table("DIAGONAL_SLIDES", &diagonal_data, &mut output_file)?;
-        write_table("DIAGONAL_META", &diagonal_meta, &mut output_file)?;
+        write_table("DIAGONAL_SLIDES", &diagonal_data, "BitBoard",  &mut output_file)?;
+        write_table("DIAGONAL_META", &diagonal_meta, "Metadata", &mut output_file)?;
     }
 
     #[cfg(not(target_feature = "bmi2"))]
@@ -384,19 +383,21 @@ fn main() -> Result<(), Error> {
         generate_table(cross_metadata, &mut table, 12, gen_cross_slides);
         generate_table(diagonal_metadata, &mut table, 9, gen_diagonal_slides);
 
-        write_table("SLIDES", &table, &mut output_file)?;
-        write_table("CROSS_META", &cross_metadata, &mut output_file)?;
-        write_table("DIAGONAL_META", &diagonal_metadata, &mut output_file)?;
+        write_table("SLIDES", &table, "BitBoard", &mut output_file)?;
+        write_table("CROSS_META", &cross_metadata, "Metadata", &mut output_file)?;
+        write_table("DIAGONAL_META", &diagonal_metadata, "Metadata", &mut output_file)?;
     }
 
     write_table(
         "KNIGHT_ATTACKS",
         &gen_piece_table(gen_knight_index),
+        "BitBoard",
         &mut output_file,
     )?;
     write_table(
         "KING_ATTACKS",
         &gen_piece_table(gen_king_index),
+        "BitBoard",
         &mut output_file,
     )?;
 
@@ -407,6 +408,7 @@ fn main() -> Result<(), Error> {
 
             square.move_one_up_left(Color::White) + square.move_one_up_right(Color::White)
         }),
+        "BitBoard",
         &mut output_file,
     )?;
 
@@ -417,6 +419,7 @@ fn main() -> Result<(), Error> {
 
             square.move_one_up_left(Color::Black) + square.move_one_up_right(Color::Black)
         }),
+        "BitBoard",
         &mut output_file,
     )?;
 
@@ -433,6 +436,7 @@ fn main() -> Result<(), Error> {
                     BitBoard::EMPTY
                 }
         }),
+        "BitBoard",
         &mut output_file,
     )?;
 
@@ -449,6 +453,7 @@ fn main() -> Result<(), Error> {
                     BitBoard::EMPTY
                 }
         }),
+        "BitBoard",
         &mut output_file,
     )?;
 
@@ -466,6 +471,7 @@ fn main() -> Result<(), Error> {
                 .map(BitBoard::from)
                 .fold(BitBoard::EMPTY, |board, square| board + square)
         }),
+        "BitBoard",
         &mut output_file,
     )?;
 
@@ -484,12 +490,14 @@ fn main() -> Result<(), Error> {
                 })
                 .fold(BitBoard::EMPTY, |board, square| board + square.into())
         }),
+        "BitBoard",
         &mut output_file,
     )?;
 
     write_variable(
         "ZOBRIST_MAP",
         StdRng::seed_from_u64(SEED).gen::<ZobristMap>(),
+        "ZobristMap",
         &mut output_file,
     )?;
 

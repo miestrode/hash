@@ -44,7 +44,7 @@ trait Gen {
             (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
                 & valid_targets)
                 .bits()
-                .map(|target| Move {
+                .map(move |target| Move {
                     origin: piece,
                     target,
                     promotion: None,
@@ -60,7 +60,7 @@ trait Gen {
                     board.playing_color,
                 ) & index::line_fit(king_square, piece))
                 .bits()
-                .map(|target| Move {
+                .map(move |target| Move {
                     origin: piece,
                     target,
                     promotion: None,
@@ -75,15 +75,16 @@ pub struct Pawn;
 impl Pawn {
     unsafe fn is_legal_en_passant_capture(
         board: &Board,
-        mut occupation: BitBoard,
-        en_passant_pawn: Square,
+        en_passant_capture_square: Square,
         origin: Square,
     ) -> bool {
+        let mut occupation = board.occupation();
+
         // Update board to it's post capture state
         occupation.toggle_bit(origin);
         occupation
-            .toggle_bit(unsafe { en_passant_pawn.move_one_up_unchecked(board.playing_color) });
-        occupation.toggle_bit(en_passant_pawn);
+            .toggle_bit(unsafe { en_passant_capture_square.move_one_down_unchecked(board.playing_color) });
+        occupation.toggle_bit(en_passant_capture_square);
 
         let king = board.us.king.try_into().unwrap();
 
@@ -94,6 +95,7 @@ impl Pawn {
     }
 }
 
+// TODO: Handle promotions
 impl Gen for Pawn {
     const PIECE_KIND: PieceKind = PieceKind::Pawn;
 
@@ -127,57 +129,97 @@ impl Gen for Pawn {
         };
 
         moves.extend((board.us.pawns - board.pinned).bits().flat_map(|piece| {
-            (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
-                & valid_targets)
+            ((Self::pseudo_legal_moves(
+                piece,
+                board.us.occupation,
+                occupation,
+                board.playing_color,
+            ) & valid_targets)
+                - BitBoard::EDGE_RANKS)
                 .bits()
-                .map(|target| Move {
+                .map(move |target| Move {
                     origin: piece,
                     target,
                     promotion: None,
                 })
         }));
 
+        // Promotions
+        moves.extend((board.us.pawns - board.pinned).bits().flat_map(|piece| {
+            (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
+                & valid_targets
+                & BitBoard::EDGE_RANKS)
+                .bits()
+                .flat_map(move |target| {
+                    PieceKind::PROMOTIONS.into_iter().map(move |kind| Move {
+                        origin: piece,
+                        target,
+                        promotion: Some(kind),
+                    })
+                })
+        }));
+
         if !board.in_check() {
             moves.extend((board.us.pawns & board.pinned).bits().flat_map(|piece| {
-                (Self::pseudo_legal_moves(
+                ((Self::pseudo_legal_moves(
                     piece,
                     board.us.occupation,
                     occupation,
                     board.playing_color,
                 ) & index::line_fit(king_square, piece))
-                .bits()
-                .map(|target| Move {
-                    origin: piece,
-                    target,
-                    promotion: None,
-                })
+                    - BitBoard::EDGE_RANKS)
+                    .bits()
+                    .map(move |target| Move {
+                        origin: piece,
+                        target,
+                        promotion: None,
+                    })
+            }));
+
+            // Promotions
+            moves.extend((board.us.pawns & board.pinned).bits().flat_map(|piece| {
+                ((Self::pseudo_legal_moves(
+                    piece,
+                    board.us.occupation,
+                    occupation,
+                    board.playing_color,
+                ) & index::line_fit(king_square, piece))
+                    + BitBoard::EDGE_RANKS)
+                    .bits()
+                    .flat_map(move |target| {
+                        PieceKind::PROMOTIONS.into_iter().map(move |kind| Move {
+                            origin: piece,
+                            target,
+                            promotion: Some(kind),
+                        })
+                    })
             }));
         }
 
         unsafe {
-            if let Some(en_passant_square) = board.en_passant_square {
+            if let Some(en_passant_capture_square) = board.en_passant_capture_square {
                 let left_origin =
-                    en_passant_square.move_one_down_left_unchecked(board.playing_color);
+                    en_passant_capture_square.move_one_down_left_unchecked(board.playing_color);
                 let right_origin =
-                    en_passant_square.move_one_down_right_unchecked(board.playing_color);
+                    en_passant_capture_square.move_one_down_right_unchecked(board.playing_color);
 
                 let correct_pawn = Some(Piece {
                     color: board.playing_color,
                     kind: PieceKind::Pawn,
                 });
 
-                if correct_pawn == board.piece(left_origin) {
+                if correct_pawn == board.piece(left_origin) && Pawn::is_legal_en_passant_capture(board, en_passant_capture_square, left_origin) {
                     moves.push(Move {
                         origin: left_origin,
-                        target: en_passant_square.move_one_up_unchecked(board.playing_color),
+                        target: en_passant_capture_square.move_one_up_unchecked(board.playing_color),
                         promotion: None,
                     });
                 }
 
-                if correct_pawn == board.piece(right_origin) {
+                if correct_pawn == board.piece(right_origin) && Pawn::is_legal_en_passant_capture(board, en_passant_capture_square, right_origin) {
                     moves.push(Move {
                         origin: right_origin,
-                        target: en_passant_square.move_one_up_unchecked(board.playing_color),
+                        target: en_passant_capture_square.move_one_up_unchecked(board.playing_color),
                         promotion: None,
                     });
                 }
@@ -221,7 +263,7 @@ impl Gen for Knight {
             (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
                 & valid_targets)
                 .bits()
-                .map(|target| Move {
+                .map(move |target| Move {
                     origin: piece,
                     target,
                     promotion: None,
