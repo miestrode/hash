@@ -14,22 +14,52 @@ use crate::{bitboard::BitBoard, Color};
 pub struct Square(pub(crate) u8);
 
 impl Square {
+    /// Numeric value for the A file. Corresponds to values returned from [`Square::file`].
     pub const A_FILE: u8 = 0;
+
+    /// Numeric value for the B file. Corresponds to values returned from [`Square::file`].
     pub const B_FILE: u8 = 1;
+
+    /// Numeric value for the C file. Corresponds to values returned from [`Square::file`].
     pub const C_FILE: u8 = 2;
+
+    /// Numeric value for the D file. Corresponds to values returned from [`Square::file`].
     pub const D_FILE: u8 = 3;
+
+    /// Numeric value for the E file. Corresponds to values returned from [`Square::file`].
     pub const E_FILE: u8 = 4;
+
+    /// Numeric value for the F file. Corresponds to values returned from [`Square::file`].
     pub const F_FILE: u8 = 5;
+
+    /// Numeric value for the G file. Corresponds to values returned from [`Square::file`].
     pub const G_FILE: u8 = 6;
+
+    /// Numeric value for the H file. Corresponds to values returned from [`Square::file`].
     pub const H_FILE: u8 = 7;
 
+    /// Numeric value for the first rank. Corresponds to values returned from [`Square::rank`].
     pub const RANK_1: u8 = 0;
+
+    /// Numeric value for the second rank. Corresponds to values returned from [`Square::rank`].
     pub const RANK_2: u8 = 1;
+
+    /// Numeric value for the third rank. Corresponds to values returned from [`Square::rank`].
     pub const RANK_3: u8 = 2;
+
+    /// Numeric value for the fourth rank. Corresponds to values returned from [`Square::rank`].
     pub const RANK_4: u8 = 3;
+
+    /// Numeric value for the fifth rank. Corresponds to values returned from [`Square::rank`].
     pub const RANK_5: u8 = 4;
+
+    /// Numeric value for the sixth rank. Corresponds to values returned from [`Square::rank`].
     pub const RANK_6: u8 = 5;
+
+    /// Numeric value for the seventh rank. Corresponds to values returned from [`Square::rank`].
     pub const RANK_7: u8 = 6;
+
+    /// Numeric value for the eighth rank. Corresponds to values returned from [`Square::rank`].
     pub const RANK_8: u8 = 7;
 
     pub const A1: Square = Square(0b000000);
@@ -98,7 +128,8 @@ impl Square {
     pub const H8: Square = Square(0b111111);
 
     /// An array of all the squares of a Chess board, arranged in left-to-right, bottom-to-top
-    /// order.
+    /// order. This means that, for example `Square::ALL[0] == Square::A1`
+    /// and in general `Square::ALL[test_square] == test_square`.
     pub const ALL: [Square; 64] = [
         Self::A1,
         Self::B1,
@@ -188,9 +219,11 @@ impl Square {
     ///
     /// # Example
     /// ```
+    /// # use hash_bootstrap::{Color, Square};
+    ///
     /// let square = Square::F4;
     ///
-    /// assert_eq!(unsafe { square.move_one_down_unchecked() }, Square::F3);
+    /// assert_eq!(unsafe { square.move_one_down_unchecked(Color::White) }, Square::F3);
     /// ```
     ///
     /// # Safety
@@ -207,9 +240,11 @@ impl Square {
     ///
     /// # Example
     /// ```
+    /// # use hash_bootstrap::{Color, Square};
+    ///
     /// let square = Square::F4;
     ///
-    /// assert_eq!(unsafe { square.move_two_down_unchecked() }, Square::F2);
+    /// assert_eq!(unsafe { square.move_two_down_unchecked(Color::White) }, Square::F2);
     /// ```
     ///
     /// # Safety
@@ -226,9 +261,11 @@ impl Square {
     ///
     /// # Example
     /// ```
+    /// # use hash_bootstrap::{Color, Square};
+    ///
     /// let square = Square::F4;
     ///
-    /// assert_eq!(unsafe { square.move_one_down_left_unchecked() }, Square::E3);
+    /// assert_eq!(unsafe { square.move_one_down_left_unchecked(Color::White) }, Square::E3);
     /// ```
     ///
     /// # Safety
@@ -245,9 +282,11 @@ impl Square {
     ///
     /// # Example
     /// ```
+    /// # use hash_bootstrap::{Color, Square};
+    ///
     /// let square = Square::F4;
     ///
-    /// assert_eq!(unsafe { square.move_one_down_right_unchecked() }, Square::G3);
+    /// assert_eq!(unsafe { square.move_one_down_right_unchecked(Color::White) }, Square::G3);
     /// ```
     ///
     /// # Safety
@@ -264,9 +303,11 @@ impl Square {
     ///
     /// # Example
     /// ```
+    /// # use hash_bootstrap::{Color, Square};
+    ///
     /// let square = Square::F4;
     ///
-    /// assert_eq!(unsafe { square.move_one_up_unchecked() }, Square::F5);
+    /// assert_eq!(unsafe { square.move_one_up_unchecked(Color::White) }, Square::F5);
     /// ```
     ///
     /// # Safety
@@ -284,9 +325,11 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// let king = Square::E1;
+    /// # use hash_bootstrap::Square;
     ///
-    /// assert_eq!(king.rank(), 0); // Not one, as the first rank is 0.
+    /// let king = Square::WHITE_KING;
+    ///
+    /// assert_eq!(king.rank(), Square::RANK_1);
     /// ```
     pub fn rank(&self) -> u8 {
         self.0 / 8
@@ -297,9 +340,11 @@ impl Square {
     ///
     /// # Example
     /// ```
-    /// let king = Square::E1;
+    /// # use hash_bootstrap::Square;
     ///
-    /// assert_eq!(king.file(), 4);
+    /// let king = Square::BLACK_KING;
+    ///
+    /// assert_eq!(king.file(), Square::E_FILE);
     /// ```
     pub fn file(&self) -> u8 {
         self.0 % 8
@@ -310,9 +355,11 @@ impl Square {
     ///
     /// # Example
     /// ```
+    /// # use hash_bootstrap::Square;
+    ///
     /// let square = Square::A1;
     ///
-    /// assert_eq!(king.as_index(), 0);
+    /// assert_eq!(square.as_index(), 0);
     /// ```
     pub fn as_index(&self) -> usize {
         self.0 as usize
@@ -323,6 +370,8 @@ impl Square {
     ///
     /// # Example
     /// ```rust
+    /// # use hash_bootstrap::Square;
+    ///
     /// let start = Square::A1;
     /// let end = Square::H8;
     ///
@@ -353,6 +402,8 @@ impl Square {
     ///
     /// # Example
     /// ```rust
+    /// # use hash_bootstrap::Square;
+    ///
     /// let start = Square::C3;
     /// let end = Square::F6;
     ///

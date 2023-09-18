@@ -1,11 +1,12 @@
-use std::cmp::Ordering;
-use std::ops::{BitXor, BitXorAssign};
 use std::{
+    cmp::Ordering,
     fmt::{self, Display},
     iter,
-    ops::{Add, AddAssign, BitAnd, Not, Shl, Shr, Sub},
+    ops::{Add, AddAssign, BitAnd, BitXor, BitXorAssign, Not, Shl, Shr, Sub},
     str::FromStr,
 };
+
+use rustifact::ToTokenStream;
 
 use crate::square::Square;
 
@@ -13,6 +14,8 @@ use crate::square::Square;
 /// Macro for generating a bitboard. Performs no input validation. An invocation must look like:
 ///
 /// ```
+/// # use hash_bootstrap::bb;
+///
 /// bb!(
 ///     0bXXXXXXXX
 ///     0bXXXXXXXX
@@ -42,7 +45,7 @@ macro_rules! bb {
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ToTokenStream)]
 /// A Bitboard is a 64-bit integer representing the 64 squares of a Chess board. Each bit of the
 /// integer is mapped to a Chess board square. The bits can represent anything, but typically
 /// represent certain predicates that hold true on squares with value `1`.
@@ -77,7 +80,7 @@ impl Iterator for PartialSubsetIter {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, 1_usize.checked_shl(self.bitboard.count_ones()))
+        (0, Some(2usize.pow(self.bitboard.count_ones())))
     }
 }
 
@@ -94,6 +97,12 @@ impl Iterator for BitIter {
         } else {
             Some(self.bitboard.pop_first_one().unwrap())
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let exact_size = self.bitboard.count_ones() as usize;
+
+        (exact_size, Some(exact_size))
     }
 }
 
@@ -138,7 +147,7 @@ impl Display for Color {
             Color::White => 'w',
             Color::Black => 'b',
         }
-        .fmt(f)
+            .fmt(f)
     }
 }
 
@@ -353,6 +362,8 @@ impl BitBoard {
     ///
     /// # Example
     /// ```rust
+    /// # use hash_bootstrap::BitBoard;
+    ///
     /// let full = BitBoard::FULL;
     ///
     /// for subset in full.subsets() {
@@ -362,7 +373,7 @@ impl BitBoard {
     ///
     /// # Implementation
     /// Internally this uses a carry-rippler implementation, instead of something like `PDEP`.
-    pub fn subsets(&self) -> impl Iterator<Item = BitBoard> {
+    pub fn subsets(&self) -> impl Iterator<Item=BitBoard> {
         iter::once(BitBoard::EMPTY).chain(PartialSubsetIter {
             bitboard: *self,
             subset: 0,
@@ -374,15 +385,13 @@ impl BitBoard {
     ///
     /// # Example
     /// ```rust
-    /// fn print_occupation_squares(occupation: BitBoard) {
-    ///     for square in occupation {
-    ///         println!("{square}");
-    ///     }
-    /// }
+    /// # use hash_bootstrap::BitBoard;
     ///
-    /// print_occupation_squares(BitBoard::FULL); // Prints all squares in order
+    ///  for square in BitBoard::FULL {
+    ///     println!("{square}");
+    ///  }
     /// ```
-    pub fn bits(&self) -> impl Iterator<Item = Square> {
+    pub fn bits(&self) -> impl Iterator<Item=Square> {
         BitIter { bitboard: *self }
     }
 
@@ -490,6 +499,8 @@ impl BitBoard {
     ///
     /// # Example
     /// ```rust
+    /// # use hash_bootstrap::BitBoard;
+    ///
     /// let bb = BitBoard::FULL;
     ///
     /// assert_eq!(bb.count_ones(), 64);
@@ -502,6 +513,8 @@ impl BitBoard {
     ///
     /// # Example
     /// ```rust
+    /// # use hash_bootstrap::{BitBoard, Square};
+    ///
     /// let bb = BitBoard::EMPTY;
     ///
     /// assert!(!bb.get_bit(Square::H1));
@@ -514,7 +527,9 @@ impl BitBoard {
     ///
     /// # Example
     /// ```rust
-    /// let bb = BitBoard::EMPTY;
+    /// # use hash_bootstrap::{BitBoard, Square};
+    ///
+    /// let mut bb = BitBoard::EMPTY;
     ///
     /// bb.toggle_bit(Square::E4);
     /// assert!(bb.get_bit(Square::E4));
@@ -587,10 +602,8 @@ impl BitBoard {
     }
 
     /// Smears all of the `1` bits of the bitboard one rank up relative to the context `color`.
-    /// Equivalent to:
-    /// ```rust
-    /// bb.move_one_up(color) + bb
-    /// ```
+    /// Equivalent to `bb.move_one_up(color) + bb`.
+    ///
     /// As an example, consider the input:
     /// ```text
     /// . . . 1 1 1 1 .

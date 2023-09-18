@@ -19,8 +19,10 @@ harness = false
 
 [build-dependencies]
 hash-bootstrap = { path = "../hash-bootstrap" }
+rustifact = "0.9.0"
 rand = "0.8.5"
 
 [dependencies]
+rustifact = "0.9.0"
 arrayvec = "0.7.4"
 hash-bootstrap = { path = "../hash-bootstrap" }

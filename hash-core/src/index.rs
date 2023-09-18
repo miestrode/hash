@@ -1,6 +1,7 @@
-use hash_bootstrap::{
-    BitBoard, Color, Square, ZobristCastlingRights, ZobristMap, ZobristPieces, ZobristSide,
-};
+#[cfg(target_feature = "bmi2")]
+use std::arch::x86_64;
+
+use hash_bootstrap::{BitBoard, Color, Square};
 
 #[derive(Clone, Copy)]
 struct Metadata {
@@ -10,10 +11,21 @@ struct Metadata {
     pub magic: u64,
 }
 
-include!(concat!(env!("OUT_DIR"), "/out.rs"));
-
-#[cfg(target_feature = "bmi2")]
-use std::arch::x86_64;
+rustifact::use_symbols!(
+    CROSS_SLIDES,
+    CROSS_META,
+    DIAGONAL_SLIDES,
+    DIAGONAL_META,
+    KNIGHT_ATTACKS,
+    KING_ATTACKS,
+    LINE,
+    BETWEEN,
+    WHITE_PAWN_ATTACKS,
+    BLACK_PAWN_ATTACKS,
+    WHITE_PAWN_PUSHES,
+    BLACK_PAWN_PUSHES,
+    ZOBRIST_MAP
+);
 
 #[cfg(target_feature = "bmi2")]
 /// Returns the bitboard of every square a rook can reach when on the passed `origin` square.
@@ -203,7 +215,7 @@ pub(crate) fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
 /// (hypothetically).
 ///
 /// # Example
-/// ```rust
+/// ```ignore
 /// assert_eq!(index::knight_attacks(Square::D4), bb!(
 ///     0b00000000
 ///     0b00000000
@@ -223,7 +235,7 @@ pub(crate) fn knight_attacks(origin: Square) -> BitBoard {
 /// (hypothetically).
 ///
 /// # Example
-/// ```rust
+/// ```ignore
 /// assert_eq!(index::king_attacks(Square::E1), bb!(
 ///     0b00000000
 ///     0b00000000
@@ -343,16 +355,18 @@ pub(crate) fn line_between(a: Square, b: Square) -> BitBoard {
 /// Contains a variety of functions for generating Zobrist hashes for different parts of a board.
 ///
 /// # Example
-/// ```rust
+/// ```ignore
 /// let white_king_rook = zobrist::piece(Piece::WHITE_ROOK, Square::WHITE_KING_ROOK);
 /// let side_to_play = zobrist::side(Color::Black);
 ///
 /// let combined_hash = white_king_rook ^ side_to_play;
 /// ```
 pub(crate) mod zobrist {
-    use super::ZOBRIST_MAP;
-    use crate::repr::{CastlingRights, ColoredPieceTable, Piece, PieceKind};
     use hash_bootstrap::{Color, Square};
+
+    use crate::repr::{CastlingRights, ColoredPieceTable, Piece, PieceKind};
+
+    use super::ZOBRIST_MAP;
 
     /// Generates the Zobrist hash for the given side. In a board this should be applied based on
     /// the currently playing player.
@@ -370,8 +384,8 @@ pub(crate) mod zobrist {
     ///
     /// # Example
     /// Assuming a double-push happened on the E file we would have:
-    /// ```rust
-    /// let en_passant_hash = zobrist::en_passant_file(4);
+    /// ```ignore
+    /// let e_file_en_passant_hash = zobrist::en_passant_file(4);
     /// ```
     ///
     /// # Panics
@@ -389,10 +403,10 @@ pub(crate) mod zobrist {
     /// Generates the Zobrist hash for a piece at a given square. Used in [`zobrist::piece_table`].
     ///
     /// # Example
-    /// ```rust
+    /// ```ignore
     /// let black_king = zobrist::piece(Piece::BLACK_KING, Square::BLACK_KING);
     /// ```
-    pub fn piece(piece: Piece, square: Square) -> u64 {
+    pub(crate) fn piece(piece: Piece, square: Square) -> u64 {
         (match piece.kind {
             PieceKind::King => ZOBRIST_MAP.pieces.king,
             PieceKind::Queen => ZOBRIST_MAP.pieces.queen,
@@ -404,7 +418,8 @@ pub(crate) mod zobrist {
             .wrapping_mul(side(piece.color))
     }
 
-    /// Generates the Zobrist hash for a [`ColoredPieceTable`].
+    /// Generates the Zobrist hash for a [`ColoredPieceTable`], by using [`zobrist::piece`] on each
+    /// piece in the table individually.
     pub(crate) fn piece_table(piece_table: &ColoredPieceTable) -> u64 {
         piece_table
             .pieces()

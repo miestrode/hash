@@ -5,9 +5,8 @@ use hash_bootstrap::{BitBoard, Color, Square};
 use crate::{
     cache::CacheHash,
     index,
-    repr::{Move, Piece, PieceTable, Player},
+    repr::{Move, Piece, PieceKind, PieceTable, Player},
 };
-use crate::repr::PieceKind;
 
 #[derive(Clone, Copy)]
 pub struct Board {
@@ -76,7 +75,7 @@ impl Board {
         } else {
             &mut self.them
         }
-            .toggle_piece(square, piece.kind);
+        .toggle_piece(square, piece.kind);
     }
 
     // INVARIANT: A piece as specified must exist on the specified square.
@@ -88,7 +87,7 @@ impl Board {
         } else {
             &mut self.them
         }
-            .toggle_piece(square, piece.kind);
+        .toggle_piece(square, piece.kind);
     }
 
     pub(crate) fn update_move_restrictions(&mut self) {
@@ -98,7 +97,7 @@ impl Board {
         let attackers = (index::rook_slides(enemy_king_square, self.us.occupation)
             & (self.us.rooks + self.us.queens))
             + (index::bishop_slides(enemy_king_square, self.us.occupation)
-            & (self.us.bishops + self.us.queens));
+                & (self.us.bishops + self.us.queens));
 
         // Update pins
         for attacker in attackers.bits() {
@@ -124,6 +123,8 @@ impl Board {
         let moved_piece_kind = self.piece_table.piece_kind(chess_move.origin).unwrap();
         let target_piece_kind = self.piece_table.piece_kind(chess_move.target);
 
+        let mut is_capture = false;
+
         self.us.castling_rights.revoke(chess_move.origin);
         self.them.castling_rights.revoke(chess_move.target);
 
@@ -146,6 +147,8 @@ impl Board {
                         color: !self.playing_color,
                     },
                 );
+
+                is_capture = true;
             } else if moved_piece_kind == PieceKind::Pawn {
                 if (chess_move.origin.rank() == 1 || chess_move.origin.rank() == 6)
                     && (chess_move.target.rank() == 3 || chess_move.target.rank() == 4)
@@ -167,6 +170,8 @@ impl Board {
                             color: self.playing_color,
                         },
                     );
+
+                    is_capture = true;
                 }
             }
 
@@ -225,7 +230,7 @@ impl Board {
         let attackers = (index::rook_slides(enemy_king_square, self.us.occupation)
             & (self.us.rooks + self.us.queens))
             + (index::bishop_slides(enemy_king_square, self.us.occupation)
-            & (self.us.bishops + self.us.queens));
+                & (self.us.bishops + self.us.queens));
 
         // Update pins
         for attacker in attackers.bits() {
@@ -243,6 +248,6 @@ impl Board {
 
         self.playing_color = !self.playing_color;
 
-        todo!()
+        moved_piece_kind == PieceKind::Pawn || is_capture
     }
 }

@@ -1,11 +1,10 @@
 use arrayvec::ArrayVec;
 use hash_bootstrap::{BitBoard, Color, Square};
 
-use crate::repr::Piece;
 use crate::{
     board::Board,
     index,
-    repr::{Move, PieceKind},
+    repr::{Move, Piece, PieceKind},
 };
 
 /// The maximum number of moves stored by [`Moves`]. This shouldn't be relevant for most
@@ -82,8 +81,9 @@ impl Pawn {
 
         // Update board to it's post capture state
         occupation.toggle_bit(origin);
-        occupation
-            .toggle_bit(unsafe { en_passant_capture_square.move_one_down_unchecked(board.playing_color) });
+        occupation.toggle_bit(unsafe {
+            en_passant_capture_square.move_one_down_unchecked(board.playing_color)
+        });
         occupation.toggle_bit(en_passant_capture_square);
 
         let king = board.us.king.try_into().unwrap();
@@ -208,18 +208,32 @@ impl Gen for Pawn {
                     kind: PieceKind::Pawn,
                 });
 
-                if correct_pawn == board.piece(left_origin) && Pawn::is_legal_en_passant_capture(board, en_passant_capture_square, left_origin) {
+                if correct_pawn == board.piece(left_origin)
+                    && Pawn::is_legal_en_passant_capture(
+                        board,
+                        en_passant_capture_square,
+                        left_origin,
+                    )
+                {
                     moves.push(Move {
                         origin: left_origin,
-                        target: en_passant_capture_square.move_one_up_unchecked(board.playing_color),
+                        target: en_passant_capture_square
+                            .move_one_up_unchecked(board.playing_color),
                         promotion: None,
                     });
                 }
 
-                if correct_pawn == board.piece(right_origin) && Pawn::is_legal_en_passant_capture(board, en_passant_capture_square, right_origin) {
+                if correct_pawn == board.piece(right_origin)
+                    && Pawn::is_legal_en_passant_capture(
+                        board,
+                        en_passant_capture_square,
+                        right_origin,
+                    )
+                {
                     moves.push(Move {
                         origin: right_origin,
-                        target: en_passant_capture_square.move_one_up_unchecked(board.playing_color),
+                        target: en_passant_capture_square
+                            .move_one_up_unchecked(board.playing_color),
                         promotion: None,
                     });
                 }
