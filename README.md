@@ -2,8 +2,7 @@
 
 [![Status](https://github.com/miestrode/hash/workflows/Rust/badge.svg)](https://github.com/miestrode/hash/actions)
 
-Hash is an experimental Chess engine written in Rust, with the goal of putting to use recent advancements in statistics, computer science and computer Chess.
-Unlike most traditional Chess engines, Hash doesn't use the alpha-beta framework, and instead opts to perform directed tree search in the form of AlphaZero-style MCTS. However, unlike Chess engines such as Leela Chess Zero, Hash incorporates new ideas in it's search, utilizing root-tree parallelization and move-picking via Murphy Sampling, which should greatly improve it's play.
+Hash is an experimental Chess engine written in Rust, with the goal of putting to use recent advancements in statistics, computer science and computer Chess. Unlike most traditional Chess engines, Hash doesn't use the alpha-beta framework, and instead opts to perform directed tree search in the form of AlphaZero-style MCTS. However, unlike Chess engines such as Leela Chess Zero, Hash incorporates new ideas in it's search, utilizing root-tree parallelization and move-picking via Murphy Sampling, which should greatly improve it's play.
 
 A secondary goal of Hash is to use as much Rust as possible in it's design, to test the boundaries of what is possible to do well currently, using Rust. Some areas may suffer, or just won't use Rust as a result, such as network training.
 
