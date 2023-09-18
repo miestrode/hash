@@ -75,7 +75,7 @@ impl Board {
         } else {
             &mut self.them
         }
-        .toggle_piece(square, piece.kind);
+            .toggle_piece(square, piece.kind);
     }
 
     // INVARIANT: A piece as specified must exist on the specified square.
@@ -87,7 +87,7 @@ impl Board {
         } else {
             &mut self.them
         }
-        .toggle_piece(square, piece.kind);
+            .toggle_piece(square, piece.kind);
     }
 
     pub(crate) fn update_move_restrictions(&mut self) {
@@ -97,7 +97,7 @@ impl Board {
         let attackers = (index::rook_slides(enemy_king_square, self.us.occupation)
             & (self.us.rooks + self.us.queens))
             + (index::bishop_slides(enemy_king_square, self.us.occupation)
-                & (self.us.bishops + self.us.queens));
+            & (self.us.bishops + self.us.queens));
 
         // Update pins
         for attacker in attackers.bits() {
@@ -230,7 +230,7 @@ impl Board {
         let attackers = (index::rook_slides(enemy_king_square, self.us.occupation)
             & (self.us.rooks + self.us.queens))
             + (index::bishop_slides(enemy_king_square, self.us.occupation)
-                & (self.us.bishops + self.us.queens));
+            & (self.us.bishops + self.us.queens));
 
         // Update pins
         for attacker in attackers.bits() {

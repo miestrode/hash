@@ -22,7 +22,7 @@ const CACHE_LENGTH: usize = 1000;
 
 #[derive(Clone)]
 pub struct Game {
-    board: Board,
+    pub board: Board,
     half_moves: u16, // This is the number of half moves since the last capture or pawn move
     repetition_cache: Cache<u8, CACHE_LENGTH>,
 }
@@ -245,7 +245,7 @@ impl Game {
         perft(&self.board, depth)
     }
 
-    pub unsafe fn make_move_unchecked(&mut self, chess_move: &Move) {
+    pub(crate) unsafe fn make_move_unchecked(&mut self, chess_move: &Move) {
         let previous_value = self.repetition_cache.get(&self.board).unwrap_or(0);
         self.repetition_cache
             .insert(&self.board, previous_value + 1);
@@ -256,7 +256,7 @@ impl Game {
     }
 
     // NOTE: that draw by repetition and the 50-move rule both require one to claim the draw
-    // (although in practice, it is autoclaimed by the GUI. Despite that, mate-in-one issues strip
+    // (although in practice, it is auto claimed by the GUI. Despite that, mate-in-one issues strip
     // of them the right to be here)
     pub fn outcome(&self) -> Option<Outcome> {
         if mg::gen_moves(&self.board).is_empty() {

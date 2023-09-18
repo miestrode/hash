@@ -6,17 +6,6 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dev-dependencies]
-criterion = "0.5.1"
-
-[[bench]]
-name = "perft"
-harness = false
-
-[[bench]]
-name = "fen"
-harness = false
-
 [build-dependencies]
 hash-bootstrap = { path = "../hash-bootstrap" }
 rustifact = "0.9.0"

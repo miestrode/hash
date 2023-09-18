@@ -7,7 +7,7 @@ use std::{
 
 use crate::{bitboard::BitBoard, Color};
 
-#[derive(Eq, Clone, Copy, PartialEq)]
+#[derive(Eq, Clone, Copy, PartialEq, Debug)]
 /// Represents a square on the Chess board. To construct a square, use one of the constants (such
 /// as [`Square::A1`], [`Square::E4`], etc.). Alternatively some select functions return `Square`s,
 /// such as [`BitBoard::pop_first_one`].

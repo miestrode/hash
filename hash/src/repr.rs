@@ -8,7 +8,7 @@ use crate::{BitBoard, Color, Square};
 #[derive(Eq, Hash, Debug, Clone, Copy, PartialEq)]
 /// Represents a type of piece, such as a [king](`PieceKind::King`),
 /// or a [queen](`PieceKind::Queen`).
-pub enum PieceKind {
+pub(crate) enum PieceKind {
     King,
     Queen,
     Rook,
@@ -52,73 +52,73 @@ impl FromStr for PieceKind {
 
 impl PieceKind {
     /// An array of each piece a pawn can promote to.
-    pub const PROMOTIONS: [Self; 4] = [Self::Queen, Self::Rook, Self::Bishop, Self::Knight];
+    pub(crate) const PROMOTIONS: [Self; 4] = [Self::Queen, Self::Rook, Self::Bishop, Self::Knight];
 }
 
 #[derive(Clone, Copy, PartialEq)]
 /// Represents a Chess piece, which has a [type](`PieceKind`) and a [color](`Color`).
-pub struct Piece {
-    pub kind: PieceKind,
-    pub color: Color,
+pub(crate) struct Piece {
+    pub(crate) kind: PieceKind,
+    pub(crate) color: Color,
 }
 
 impl Piece {
-    pub const WHITE_PAWN: Self = Self {
+    pub(crate) const WHITE_PAWN: Self = Self {
         kind: PieceKind::Pawn,
         color: Color::White,
     };
 
-    pub const WHITE_KNIGHT: Self = Self {
+    pub(crate) const WHITE_KNIGHT: Self = Self {
         kind: PieceKind::Knight,
         color: Color::White,
     };
 
-    pub const WHITE_BISHOP: Self = Self {
+    pub(crate) const WHITE_BISHOP: Self = Self {
         kind: PieceKind::Bishop,
         color: Color::White,
     };
 
-    pub const WHITE_ROOK: Self = Self {
+    pub(crate) const WHITE_ROOK: Self = Self {
         kind: PieceKind::Rook,
         color: Color::White,
     };
 
-    pub const WHITE_QUEEN: Self = Self {
+    pub(crate) const WHITE_QUEEN: Self = Self {
         kind: PieceKind::Queen,
         color: Color::White,
     };
 
-    pub const WHITE_KING: Self = Self {
+    pub(crate) const WHITE_KING: Self = Self {
         kind: PieceKind::King,
         color: Color::White,
     };
 
-    pub const BLACK_PAWN: Self = Self {
+    pub(crate) const BLACK_PAWN: Self = Self {
         kind: PieceKind::Pawn,
         color: Color::Black,
     };
 
-    pub const BLACK_KNIGHT: Self = Self {
+    pub(crate) const BLACK_KNIGHT: Self = Self {
         kind: PieceKind::Knight,
         color: Color::Black,
     };
 
-    pub const BLACK_BISHOP: Self = Self {
+    pub(crate) const BLACK_BISHOP: Self = Self {
         kind: PieceKind::Bishop,
         color: Color::Black,
     };
 
-    pub const BLACK_ROOK: Self = Self {
+    pub(crate) const BLACK_ROOK: Self = Self {
         kind: PieceKind::Rook,
         color: Color::Black,
     };
 
-    pub const BLACK_QUEEN: Self = Self {
+    pub(crate) const BLACK_QUEEN: Self = Self {
         kind: PieceKind::Queen,
         color: Color::Black,
     };
 
-    pub const BLACK_KING: Self = Self {
+    pub(crate) const BLACK_KING: Self = Self {
         kind: PieceKind::King,
         color: Color::Black,
     };
@@ -144,7 +144,7 @@ impl Display for Piece {
                 PieceKind::Pawn => 'p',
             },
         }
-        .fmt(f)
+            .fmt(f)
     }
 }
 
@@ -232,7 +232,8 @@ pub(crate) struct Player {
     pub(crate) bishops: BitBoard,
     pub(crate) knights: BitBoard,
     pub(crate) pawns: BitBoard,
-    pub(crate) occupation: BitBoard, // All of the squares occupied by this player
+    pub(crate) occupation: BitBoard,
+    // All of the squares occupied by this player
     pub(crate) castling_rights: CastlingRights,
 }
 

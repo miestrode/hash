@@ -1,7 +1,7 @@
 #[cfg(target_feature = "bmi2")]
 use std::arch::x86_64;
 
-use hash_bootstrap::{BitBoard, Color, Square};
+use hash_bootstrap::{BitBoard, Color, Square, ZobristSide, ZobristCastlingRights, ZobristPieces, ZobristMap};
 
 #[derive(Clone, Copy)]
 struct Metadata {
@@ -261,7 +261,7 @@ pub(crate) fn pawn_attacks(origin: Square, color: Color) -> BitBoard {
 
 /// Returns a bitboard of all squares that a pawn could move to if on the passed square, given
 /// a set of friendly blockers and blockers, and the color to do this in relation to.
-pub(crate) fn pawn_moves(
+pub fn pawn_moves(
     origin: Square,
     friendly_blockers: BitBoard,
     enemy_blockers: BitBoard,

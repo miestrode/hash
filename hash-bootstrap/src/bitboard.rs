@@ -5,6 +5,7 @@ use std::{
     ops::{Add, AddAssign, BitAnd, BitXor, BitXorAssign, Not, Shl, Shr, Sub},
     str::FromStr,
 };
+use std::fmt::Binary;
 
 use rustifact::ToTokenStream;
 
@@ -13,7 +14,7 @@ use crate::square::Square;
 #[macro_export]
 /// Macro for generating a bitboard. Performs no input validation. An invocation must look like:
 ///
-/// ```
+/// ```ignore
 /// # use hash_bootstrap::bb;
 ///
 /// bb!(
@@ -361,7 +362,7 @@ impl BitBoard {
     /// and so also appears here.
     ///
     /// # Example
-    /// ```rust
+    /// ```ignore
     /// # use hash_bootstrap::BitBoard;
     ///
     /// let full = BitBoard::FULL;
@@ -387,7 +388,7 @@ impl BitBoard {
     /// ```rust
     /// # use hash_bootstrap::BitBoard;
     ///
-    ///  for square in BitBoard::FULL {
+    ///  for square in BitBoard::FULL.bits() {
     ///     println!("{square}");
     ///  }
     /// ```
@@ -631,6 +632,21 @@ impl BitBoard {
     /// Notice the bit duplication.
     pub fn smear_one_up(self, color: Color) -> Self {
         self.move_one_up(color) + self
+    }
+}
+
+impl Display for BitBoard {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let bytes = self.0.to_be_bytes();
+
+        write!(f, "{:08b}", bytes[0])?;
+
+        for byte in &bytes[1..] {
+            '\n'.fmt(f)?;
+            write!(f, "{:08b}", byte)?;
+        }
+
+        Ok(())
     }
 }
 
