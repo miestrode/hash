@@ -17,7 +17,7 @@ to do well currently, using Rust. Some areas may suffer, or just won't use Rust 
 The primary things as of right now to be done, are:
 
 - [x] Restructure the project (combine `hash-core`, `hash-search`, `hash-eval` and `hash-cli`)
-- [ ] Finish the move generation refactor
+- [x] Finish the move generation refactor
 - [ ] Refactor the build script, and it's magic bitboards setup (consider using `phf`, and unrelatedly switching to
   black
   magic bitboards)
