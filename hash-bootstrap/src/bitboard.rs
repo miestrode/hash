@@ -646,7 +646,7 @@ impl Display for BitBoard {
                     .map(|char| char.to_string())
                     .collect::<Vec<_>>()
                     .join(" ")
-                    .replace("0", ".")
+                    .replace('0', ".")
             })
             .join("\n")
             .fmt(f)

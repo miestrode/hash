@@ -223,7 +223,7 @@ impl Default for Game {
 }
 
 impl Game {
-    pub fn perft(&self, depth: u32) -> u64 {
+    pub(crate) fn perft(&self, depth: u32) -> u64 {
         self.board.perft(depth)
     }
 

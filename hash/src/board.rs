@@ -68,7 +68,7 @@ impl Board {
     }
 
     // INVARIANT: A piece as specified must NOT exist on the specified square.
-    pub(crate) unsafe fn add_piece_unchecked(&mut self, square: Square, piece: Piece) {
+    unsafe fn add_piece_unchecked(&mut self, square: Square, piece: Piece) {
         self.piece_table.set(square, Some(piece.kind));
 
         if piece.color == self.playing_color {
@@ -80,7 +80,7 @@ impl Board {
     }
 
     // INVARIANT: A piece as specified must exist on the specified square.
-    pub(crate) unsafe fn remove_piece_unchecked(&mut self, square: Square, piece: Piece) {
+    unsafe fn remove_piece_unchecked(&mut self, square: Square, piece: Piece) {
         self.piece_table.set(square, None);
 
         if piece.color == self.playing_color {
@@ -118,7 +118,7 @@ impl Board {
 
     // INVARIANT: The passed move must be legal in relation to the current board.
     // NOTE: The method returns true if the move was a pawn move or a capture
-    pub unsafe fn make_move_unchecked(&mut self, chess_move: &Move) -> bool {
+    pub(crate) unsafe fn make_move_unchecked(&mut self, chess_move: &Move) -> bool {
         self.en_passant_capture_square = None;
         self.checkers = BitBoard::EMPTY;
         self.pinned = BitBoard::EMPTY;
@@ -266,28 +266,12 @@ impl Board {
                 .into_iter()
                 .map(|chess_move| {
                     let mut new_board = *self;
+
                     unsafe { new_board.make_move_unchecked(&chess_move) };
 
                     new_board.perft(depth - 1)
                 })
                 .sum(),
         }
-    }
-
-    pub fn split_perft(&self, depth: u32) -> u64 {
-        let mut sum = 0;
-
-        for chess_move in mg::gen_moves(&self) {
-            let mut new_board = *self;
-            unsafe { new_board.make_move_unchecked(&chess_move) };
-
-            let nodes = new_board.perft(depth - 1);
-
-            println!("{chess_move}: {}", nodes);
-
-            sum += nodes;
-        }
-
-        sum
     }
 }

@@ -2,8 +2,7 @@ use std::{
     fmt::{self, Display, Write},
     str::FromStr,
 };
-
-use crate::{BitBoard, Color, Square};
+use hash_bootstrap::{BitBoard, Color, Square};
 
 #[derive(Eq, Hash, Debug, Clone, Copy, PartialEq)]
 /// Represents a type of piece, such as a [king](`PieceKind::King`),
