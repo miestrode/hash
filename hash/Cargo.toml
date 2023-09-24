@@ -1,6 +1,6 @@
 [package]
-name = "hash-core"
-description = "Core data structures to be used for implementing Chess engines, part of the Hash Chess Engine"
+name = "hash"
+description = "The Hash Chess Engine"
 version = "0.1.0"
 edition = "2021"
 

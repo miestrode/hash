@@ -1,13 +1,11 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
-pub mod board;
-pub mod cache;
-pub mod game;
-pub mod index;
-pub mod mg;
-pub mod repr;
-
-pub use hash_bootstrap::*;
+mod board;
+mod cache;
+mod game;
+mod index;
+mod mg;
+mod repr;
 
 #[cfg(test)]
 mod tests {
@@ -30,11 +28,16 @@ mod tests {
 
     #[test]
     fn perft_default_2() {
-        assert_eq!(Game::default().perft(6), 119060324);
+        assert_eq!(Game::default().perft(5), 4865609);
     }
 
     #[test]
     fn perft_default_3() {
+        assert_eq!(Game::default().perft(6), 119060324);
+    }
+
+    #[test]
+    fn perft_default_4() {
         assert_eq!(Game::default().perft(7), 3195901860);
     }
 
@@ -124,8 +127,8 @@ mod tests {
             Game::from_str(
                 "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"
             )
-            .unwrap()
-            .perft(3),
+                .unwrap()
+                .perft(3),
             89890
         );
     }

@@ -23,7 +23,8 @@ const CACHE_LENGTH: usize = 1000;
 #[derive(Clone)]
 pub struct Game {
     pub board: Board,
-    half_moves: u16, // This is the number of half moves since the last capture or pawn move
+    half_moves: u16,
+    // This is the number of half moves since the last capture or pawn move
     repetition_cache: Cache<u8, CACHE_LENGTH>,
 }
 
@@ -41,7 +42,7 @@ impl FromStr for Game {
 
             let en_passant_capture_square = match parts[3] {
                 "-" => None,
-                square => Some(Square::from_str(square)?.into()),
+                square => Some(Square::from_str(square)?),
             };
 
             let half_moves = parts[4]
@@ -62,15 +63,15 @@ impl FromStr for Game {
                 .zip(Square::ALL)
             {
                 if let Some(Piece {
-                    kind,
-                    color: Color::White,
-                }) = piece
+                                kind,
+                                color: Color::White,
+                            }) = piece
                 {
                     white.toggle_piece(square, kind);
                 } else if let Some(Piece {
-                    kind,
-                    color: Color::Black,
-                }) = piece
+                                       kind,
+                                       color: Color::Black,
+                                   }) = piece
                 {
                     black.toggle_piece(square, kind);
                 }
@@ -113,7 +114,7 @@ impl FromStr for Game {
                 hash: zobrist::piece_table(&colored_piece_table)
                     ^ zobrist::side(current_color)
                     ^ en_passant_capture_square
-                        .map_or(0, |square| zobrist::en_passant_file(square.file()))
+                    .map_or(0, |square| zobrist::en_passant_file(square.file()))
                     ^ zobrist::castling_rights(&white.castling_rights)
                     ^ zobrist::castling_rights(&black.castling_rights),
                 checkers: BitBoard::EMPTY,
@@ -223,26 +224,7 @@ impl Default for Game {
 
 impl Game {
     pub fn perft(&self, depth: u32) -> u64 {
-        fn perft(board: &Board, depth: u32) -> u64 {
-            let moves = mg::gen_moves(board);
-
-            match depth {
-                // At a depth of one we know all next moves will reach depth zero.
-                // Thus, we can know they are all leaves and add one each to the nodes searched.
-                1 => moves.len() as u64,
-                _ => moves
-                    .into_iter()
-                    .map(|chess_move| {
-                        let mut new_board = *board;
-                        unsafe { new_board.make_move_unchecked(&chess_move) };
-
-                        perft(&new_board, depth - 1)
-                    })
-                    .sum(),
-            }
-        }
-
-        perft(&self.board, depth)
+        self.board.perft(depth)
     }
 
     pub(crate) unsafe fn make_move_unchecked(&mut self, chess_move: &Move) {

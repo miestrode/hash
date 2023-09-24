@@ -446,7 +446,7 @@ fn main() -> Result<(), Error> {
             Square::ALL
                 .into_iter()
                 .filter(|&square| {
-                    square.on_line_with(first_square) && square.on_line_with(second_square)
+                    square.on_line(first_square, second_square)
                 })
                 .map(BitBoard::from)
                 .fold(BitBoard::EMPTY, |board, square| board + square)
@@ -463,9 +463,10 @@ fn main() -> Result<(), Error> {
             Square::ALL
                 .into_iter()
                 .filter(|&square| {
-                    square.on_line_with(first_square)
-                        && square.on_line_with(second_square)
+                    square.on_line(first_square, second_square)
                         && square.in_rectangle(first_square, second_square)
+                        && (square != first_square)
+                        && (square != second_square)
                 })
                 .fold(BitBoard::EMPTY, |board, square| board + square.into())
         })

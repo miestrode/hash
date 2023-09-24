@@ -365,8 +365,8 @@ impl Square {
         self.0 as usize
     }
 
-    /// Checks if the current square forms a line with the provided `other` square. A line can be
-    /// horizontal, vertical or diagonal.
+    /// Checks if assuming there is a line between the two squares `start` and `end`, `test` is on
+    /// that line.
     ///
     /// # Example
     /// ```rust
@@ -374,31 +374,58 @@ impl Square {
     ///
     /// let start = Square::A1;
     /// let end = Square::H8;
+    /// let test = Square::E5;
     ///
-    /// assert!(start.on_line_with(end));
+    /// assert!(test.on_line(start, end));
     /// ```
-    pub fn on_line_with(&self, other: Self) -> bool {
-        self.rank() == other.rank()
-            || self.file() == other.file()
-            || self.file().abs_diff(other.file()) == self.rank().abs_diff(other.rank())
+    pub fn on_line(&self, start: Square, end: Square) -> bool {
+        #[derive(Eq, PartialEq)]
+        pub enum LineKind {
+            /// A horizontal line.
+            Horizontal,
+            /// A vertical line.
+            Vertical,
+            /// A diagonal line.
+            Diagonal,
+            /// Used to indicate that any line could be drawn between the two squares.
+            All,
+        }
+
+        pub fn line_kind_with(a: Square, b: Square) -> Option<LineKind> {
+            if a == b {
+                Some(LineKind::All)
+            } else if a.rank() == b.rank() {
+                Some(LineKind::Vertical)
+            } else if
+            a.file() == b.file() {
+                Some(LineKind::Horizontal)
+            } else if a.file().abs_diff(b.file()) == a.rank().abs_diff(b.rank())
+            {
+                Some(LineKind::Diagonal)
+            } else {
+                None
+            }
+        }
+
+        line_kind_with(start, end) == line_kind_with(end, *self) && line_kind_with(end, *self) == line_kind_with(*self, start)
     }
 
     /// Checks if the current square exists in the rectangle formed by the two passed squares `a`
-    /// and `b`, that doesn't include `a` and `b`.
+    /// and `b`.
     ///
     /// This means that for example for squares C3 and F6 the resulting rectangle is:
     /// ```text
     /// . . . . . . . .
     /// . . . . . . . .
-    /// . . . . . X . .
-    /// . . . 1 1 . . .
-    /// . . . 1 1 . . .
-    /// . . X . . . . .
+    /// . . 1 1 1 X . .
+    /// . . 1 1 1 1 . .
+    /// . . 1 1 1 1 . .
+    /// . . X 1 1 1 . .
     /// . . . . . . . .
     /// . . . . . . . .
     /// ```
     ///
-    /// Where the `X`s are the two squares forming the rectangle.
+    /// Where the `X`s are the two squares forming the rectangle, which are also `1`s.
     ///
     /// # Example
     /// ```rust
@@ -410,8 +437,12 @@ impl Square {
     /// assert!(Square::E5.in_rectangle(start, end));
     /// ```
     pub fn in_rectangle(&self, a: Square, b: Square) -> bool {
-        (a.file() + 1..b.file()).contains(&self.file())
-            && (a.rank() + 1..b.rank()).contains(&self.rank())
+        fn between(test: u8, a: u8, b: u8) -> bool {
+            a.min(b) <= test && test <= a.max(b)
+        }
+
+        between(self.file(), a.file(), b.file())
+            && between(self.rank(), a.rank(), b.rank())
     }
 }
 

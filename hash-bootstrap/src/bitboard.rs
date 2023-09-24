@@ -5,7 +5,6 @@ use std::{
     ops::{Add, AddAssign, BitAnd, BitXor, BitXorAssign, Not, Shl, Shr, Sub},
     str::FromStr,
 };
-use std::fmt::Binary;
 
 use rustifact::ToTokenStream;
 
@@ -107,7 +106,7 @@ impl Iterator for BitIter {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// A color in Chess, either [`White`](Color::White) or [`Black`](Color::Black). Used in [`Piece`],
 /// [`Board`] and more.
 pub enum Color {
@@ -148,7 +147,7 @@ impl Display for Color {
             Color::White => 'w',
             Color::Black => 'b',
         }
-            .fmt(f)
+        .fmt(f)
     }
 }
 
@@ -257,7 +256,7 @@ impl BitBoard {
     );
 
     // Used to check if there are any pieces between the rook and king
-    pub const WHITE_QUEEN_SIDE_CASTLE_ATTACK_MASK: Self = bb!(
+    pub const WHITE_QUEEN_SIDE_CASTLE_OCCUPATION_MASK: Self = bb!(
         0b00000000
         0b00000000
         0b00000000
@@ -269,7 +268,7 @@ impl BitBoard {
     );
 
     // Used to check if there are any attacks between the king and the king's final spot
-    pub const WHITE_QUEEN_SIDE_CASTLE_OCCUPATION_MASK: Self = bb!(
+    pub const WHITE_QUEEN_SIDE_CASTLE_ATTACK_MASK: Self = bb!(
         0b00000000
         0b00000000
         0b00000000
@@ -374,7 +373,7 @@ impl BitBoard {
     ///
     /// # Implementation
     /// Internally this uses a carry-rippler implementation, instead of something like `PDEP`.
-    pub fn subsets(&self) -> impl Iterator<Item=BitBoard> {
+    pub fn subsets(&self) -> impl Iterator<Item = BitBoard> {
         iter::once(BitBoard::EMPTY).chain(PartialSubsetIter {
             bitboard: *self,
             subset: 0,
@@ -392,7 +391,7 @@ impl BitBoard {
     ///     println!("{square}");
     ///  }
     /// ```
-    pub fn bits(&self) -> impl Iterator<Item=Square> {
+    pub fn bits(&self) -> impl Iterator<Item = Square> {
         BitIter { bitboard: *self }
     }
 
@@ -635,18 +634,22 @@ impl BitBoard {
     }
 }
 
+// TODO: Optimize this if this ever becomes a bottleneck
 impl Display for BitBoard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let bytes = self.0.to_be_bytes();
-
-        write!(f, "{:08b}", bytes[0])?;
-
-        for byte in &bytes[1..] {
-            '\n'.fmt(f)?;
-            write!(f, "{:08b}", byte)?;
-        }
-
-        Ok(())
+        self.horizontal_flip()
+            .0
+            .to_be_bytes()
+            .map(|byte| {
+                format!("{byte:08b}")
+                    .chars()
+                    .map(|char| char.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .replace("0", ".")
+            })
+            .join("\n")
+            .fmt(f)
     }
 }
 

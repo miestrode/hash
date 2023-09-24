@@ -4,11 +4,11 @@ use hash_bootstrap::{BitBoard, Color, Square};
 
 use crate::{
     cache::CacheHash,
-    index,
+    index, mg,
     repr::{Move, Piece, PieceKind, PieceTable, Player},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Board {
     pub(crate) us: Player,
     pub(crate) them: Player,
@@ -29,10 +29,11 @@ impl CacheHash for Board {
 impl Board {
     pub(crate) fn is_attacked(&self, square: Square) -> bool {
         let mut attackers = BitBoard::EMPTY;
+        let occupation = self.occupation() - self.us.king;
 
         attackers +=
-            index::rook_slides(square, self.occupation()) & (self.them.rooks + self.them.queens);
-        attackers += index::bishop_slides(square, self.occupation())
+            index::rook_slides(square, occupation) & (self.them.rooks + self.them.queens);
+        attackers += index::bishop_slides(square, occupation)
             & (self.them.bishops + self.them.queens);
 
         attackers += index::knight_attacks(square) & self.them.knights;
@@ -44,7 +45,7 @@ impl Board {
             + square.move_one_up_right(self.playing_color))
             & self.them.pawns;
 
-        return !attackers.is_empty();
+        !attackers.is_empty()
     }
 
     pub(crate) fn in_check(&self) -> bool {
@@ -91,18 +92,21 @@ impl Board {
     }
 
     pub(crate) fn update_move_restrictions(&mut self) {
-        let enemy_king_square = self.them.king.try_into().unwrap();
+        let king_square = self.us.king.try_into().unwrap();
+
+        self.checkers ^= index::knight_attacks(king_square) & self.them.knights;
+        self.checkers ^= index::pawn_attacks(king_square, self.playing_color) & self.them.pawns;
 
         // Get all the sliding pieces that could be attacking the enemy king
-        let attackers = (index::rook_slides(enemy_king_square, self.us.occupation)
-            & (self.us.rooks + self.us.queens))
-            + (index::bishop_slides(enemy_king_square, self.us.occupation)
-            & (self.us.bishops + self.us.queens));
+        let attackers = (index::rook_slides(king_square, self.them.occupation)
+            & (self.them.rooks + self.them.queens))
+            + (index::bishop_slides(king_square, self.them.occupation)
+            & (self.them.bishops + self.them.queens));
 
         // Update pins
         for attacker in attackers.bits() {
             let pieces_between =
-                index::line_between(attacker, enemy_king_square) & self.them.occupation;
+                index::line_between(attacker, king_square) & self.us.occupation;
 
             if pieces_between.is_empty() {
                 self.checkers ^= attacker.into();
@@ -114,7 +118,7 @@ impl Board {
 
     // INVARIANT: The passed move must be legal in relation to the current board.
     // NOTE: The method returns true if the move was a pawn move or a capture
-    pub(crate) unsafe fn make_move_unchecked(&mut self, chess_move: &Move) -> bool {
+    pub unsafe fn make_move_unchecked(&mut self, chess_move: &Move) -> bool {
         self.en_passant_capture_square = None;
         self.checkers = BitBoard::EMPTY;
         self.pinned = BitBoard::EMPTY;
@@ -150,8 +154,7 @@ impl Board {
 
                 is_capture = true;
             } else if moved_piece_kind == PieceKind::Pawn {
-                if (chess_move.origin.rank() == 1 || chess_move.origin.rank() == 6)
-                    && (chess_move.target.rank() == 3 || chess_move.target.rank() == 4)
+                if chess_move.origin.rank().abs_diff(chess_move.target.rank()) == 2
                 {
                     // This must mean the move was a double-push
                     self.en_passant_capture_square = Some(
@@ -167,7 +170,7 @@ impl Board {
                             .move_one_down_unchecked(self.playing_color),
                         Piece {
                             kind: PieceKind::Pawn,
-                            color: self.playing_color,
+                            color: !self.playing_color,
                         },
                     );
 
@@ -192,9 +195,9 @@ impl Board {
             let king_square = chess_move.origin.as_index() as u8;
 
             let (origin, target) = if chess_move.target.file() == Square::G_FILE {
-                (king_square + 3, king_square - 1)
+                (king_square + 3, king_square + 1)
             } else {
-                (king_square - 4, king_square + 1)
+                (king_square - 4, king_square - 1)
             };
 
             // SAFETY: Move is assumed to be legal.
@@ -249,5 +252,42 @@ impl Board {
         self.playing_color = !self.playing_color;
 
         moved_piece_kind == PieceKind::Pawn || is_capture
+    }
+
+    pub(crate) fn perft(&self, depth: u32) -> u64 {
+        let moves = mg::gen_moves(self);
+
+        match depth {
+            0 => 1,
+            // At a depth of one we know all next moves will reach depth zero.
+            // Thus, we can know they are all leaves and add one each to the nodes searched.
+            1 => moves.len() as u64,
+            _ => moves
+                .into_iter()
+                .map(|chess_move| {
+                    let mut new_board = *self;
+                    unsafe { new_board.make_move_unchecked(&chess_move) };
+
+                    new_board.perft(depth - 1)
+                })
+                .sum(),
+        }
+    }
+
+    pub fn split_perft(&self, depth: u32) -> u64 {
+        let mut sum = 0;
+
+        for chess_move in mg::gen_moves(&self) {
+            let mut new_board = *self;
+            unsafe { new_board.make_move_unchecked(&chess_move) };
+
+            let nodes = new_board.perft(depth - 1);
+
+            println!("{chess_move}: {}", nodes);
+
+            sum += nodes;
+        }
+
+        sum
     }
 }

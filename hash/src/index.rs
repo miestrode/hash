@@ -272,10 +272,10 @@ pub fn pawn_moves(
 
     match color {
         Color::White => {
-            (WHITE_PAWN_ATTACKS[origin] & enemy_blockers) + WHITE_PAWN_PUSHES[origin] - smear
+            (WHITE_PAWN_ATTACKS[origin] & enemy_blockers) + (WHITE_PAWN_PUSHES[origin] - smear)
         }
         Color::Black => {
-            (BLACK_PAWN_ATTACKS[origin] & enemy_blockers) + BLACK_PAWN_PUSHES[origin] - smear
+            (BLACK_PAWN_ATTACKS[origin] & enemy_blockers) + (BLACK_PAWN_PUSHES[origin] - smear)
         }
     }
 }

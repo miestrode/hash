@@ -4,7 +4,7 @@ use hash_bootstrap::{BitBoard, Color, Square};
 use crate::{
     board::Board,
     index,
-    repr::{Move, Piece, PieceKind},
+    repr::{Move, PieceKind},
 };
 
 /// The maximum number of moves stored by [`Moves`]. This shouldn't be relevant for most
@@ -177,13 +177,13 @@ impl Gen for Pawn {
 
             // Promotions
             moves.extend((board.us.pawns & board.pinned).bits().flat_map(|piece| {
-                ((Self::pseudo_legal_moves(
+                (Self::pseudo_legal_moves(
                     piece,
                     board.us.occupation,
                     occupation,
                     board.playing_color,
-                ) & index::line_fit(king_square, piece))
-                    + BitBoard::EDGE_RANKS)
+                ) & index::line_fit(king_square, piece)
+                    & BitBoard::EDGE_RANKS)
                     .bits()
                     .flat_map(move |target| {
                         PieceKind::PROMOTIONS.into_iter().map(move |kind| Move {
@@ -195,46 +195,23 @@ impl Gen for Pawn {
             }));
         }
 
+        // En-passants
         unsafe {
             if let Some(en_passant_capture_square) = board.en_passant_capture_square {
-                let left_origin =
-                    en_passant_capture_square.move_one_down_left_unchecked(board.playing_color);
-                let right_origin =
-                    en_passant_capture_square.move_one_down_right_unchecked(board.playing_color);
-
-                let correct_pawn = Some(Piece {
-                    color: board.playing_color,
-                    kind: PieceKind::Pawn,
-                });
-
-                if correct_pawn == board.piece(left_origin)
-                    && Pawn::is_legal_en_passant_capture(
-                    board,
-                    en_passant_capture_square,
-                    left_origin,
-                )
-                {
-                    moves.push(Move {
-                        origin: left_origin,
-                        target: en_passant_capture_square
-                            .move_one_up_unchecked(board.playing_color),
-                        promotion: None,
-                    });
-                }
-
-                if correct_pawn == board.piece(right_origin)
-                    && Pawn::is_legal_en_passant_capture(
-                    board,
-                    en_passant_capture_square,
-                    right_origin,
-                )
-                {
-                    moves.push(Move {
-                        origin: right_origin,
-                        target: en_passant_capture_square
-                            .move_one_up_unchecked(board.playing_color),
-                        promotion: None,
-                    });
+                for origin in index::pawn_attacks(en_passant_capture_square, !board.playing_color).bits() {
+                    if board.us.pawns.get_bit(origin)
+                        && Pawn::is_legal_en_passant_capture(
+                        board,
+                        en_passant_capture_square,
+                        origin,
+                    )
+                    {
+                        moves.push(Move {
+                            origin,
+                            target: en_passant_capture_square,
+                            promotion: None,
+                        });
+                    }
                 }
             }
         }
@@ -356,7 +333,7 @@ impl Gen for King {
                 board.playing_color,
             )
                 .bits()
-                .filter(|square| board.is_attacked(*square))
+                .filter(|square| !board.is_attacked(*square))
                 .map(|target| Move {
                     origin: king,
                     target,

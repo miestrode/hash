@@ -196,7 +196,7 @@ impl FromStr for Move {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) struct CastlingRights(pub [bool; 64]);
 
 impl CastlingRights {
@@ -224,7 +224,7 @@ impl CastlingRights {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) struct Player {
     pub(crate) king: BitBoard,
     pub(crate) queens: BitBoard,
@@ -279,7 +279,7 @@ impl Player {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct PieceTable([Option<PieceKind>; 64]);
 
 impl PieceTable {
