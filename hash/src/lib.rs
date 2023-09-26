@@ -1,4 +1,6 @@
-#![deny(unsafe_op_in_unsafe_fn)]
+#![feature(test)]
+
+extern crate test;
 
 mod board;
 mod cache;
@@ -12,6 +14,14 @@ mod tests {
     use std::str::FromStr;
 
     use crate::game::Game;
+    use test::Bencher;
+
+    #[bench]
+    fn bench_perft_default_1(b: &mut Bencher) {
+        let game = Game::default();
+
+        b.iter(|| game.perft(5));
+    }
 
     #[test]
     fn fen_default() {

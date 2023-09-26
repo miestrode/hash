@@ -92,7 +92,8 @@ impl Board {
     }
 
     pub(crate) fn update_move_restrictions(&mut self) {
-        let king_square = self.us.king.try_into().unwrap();
+        // SAFETY: The board is assumed to be validly constructed
+        let king_square = unsafe { Square::try_from(self.us.king).unwrap_unchecked() };
 
         self.checkers ^= index::knight_attacks(king_square) & self.them.knights;
         self.checkers ^= index::pawn_attacks(king_square, self.playing_color) & self.them.pawns;
@@ -123,7 +124,8 @@ impl Board {
         self.checkers = BitBoard::EMPTY;
         self.pinned = BitBoard::EMPTY;
 
-        let enemy_king_square: Square = self.them.king.try_into().unwrap();
+        // SAFETY: The board is assumed to be valid
+        let enemy_king_square = unsafe { Square::try_from(self.them.king).unwrap_unchecked() };
         let moved_piece_kind = self.piece_table.piece_kind(chess_move.origin).unwrap();
         let target_piece_kind = self.piece_table.piece_kind(chess_move.target);
 
@@ -203,7 +205,7 @@ impl Board {
             // SAFETY: Move is assumed to be legal.
             unsafe {
                 self.remove_piece_unchecked(
-                    origin.try_into().unwrap(),
+                    Square::try_from(origin).unwrap_unchecked(),
                     Piece {
                         kind: PieceKind::Rook,
                         color: self.playing_color,
@@ -211,7 +213,7 @@ impl Board {
                 );
 
                 self.add_piece_unchecked(
-                    target.try_into().unwrap(),
+                    Square::try_from(target).unwrap_unchecked(),
                     Piece {
                         kind: PieceKind::Rook,
                         color: self.playing_color,

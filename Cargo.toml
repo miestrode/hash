@@ -2,5 +2,16 @@
 codegen-units = 1
 lto = true
 
+[profile.bench]
+inherits = "release"
+
 [workspace]
 members = ["hash-bootstrap", "hash"]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Yoav Grimland <miestrode@proton.me>"]
+edition = "2021"
+
+[workspace.lints.rust]
+unsafe_code_in_unsafe_fn = "deny"

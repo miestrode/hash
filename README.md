@@ -18,6 +18,8 @@ The primary things as of right now to be done, are:
 
 - [x] Restructure the project (combine `hash-core`, `hash-search`, `hash-eval` and `hash-cli`)
 - [x] Finish the move generation refactor
+- [ ] Try to reimplement the `Pins` data structure and other ideas from the old move generation code. It is possible
+  that reimplementing the generation of slide constraints could make it a viable, fast option again.
 - [ ] Refactor the build script, and it's magic bitboards setup (consider using `phf`, and unrelatedly switching to
   black
   magic bitboards)

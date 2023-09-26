@@ -313,7 +313,8 @@ pub fn pawn_moves(
 /// Note that the `X`s represent the squares, and would generally have `1`s on them
 /// (except in cases where there is no line fit).
 pub(crate) fn line_fit(a: Square, b: Square) -> BitBoard {
-    LINE[a.as_index() * 64 + b.as_index()]
+    // SAFETY: This table is defined for each square-pair
+    *unsafe { LINE.get_unchecked(a.as_index() * 64 + b.as_index()) }
 }
 
 /// Returns a bitboard consisting of the connecting line between the two squares passed,
@@ -349,7 +350,8 @@ pub(crate) fn line_fit(a: Square, b: Square) -> BitBoard {
 /// Note that the `X`s represent the forming squares themselves, and these would never have `1`s
 /// in them, as the line doesn't include its edge points.
 pub(crate) fn line_between(a: Square, b: Square) -> BitBoard {
-    BETWEEN[a.as_index() * 64 + b.as_index()]
+    // SAFETY: This table is defined for each square-pair
+    *unsafe {BETWEEN.get_unchecked(a.as_index() * 64 + b.as_index())}
 }
 
 /// Contains a variety of functions for generating Zobrist hashes for different parts of a board.
@@ -397,7 +399,10 @@ pub(crate) mod zobrist {
     /// Generates the Zobrist hash for the castling rights of a board, to distinguish boards
     /// based on this.
     pub(crate) fn castling_rights(castling_rights: &CastlingRights) -> u64 {
-        ZOBRIST_MAP.castling_rights.0[castling_rights.as_minimized_rights()]
+        // SAFETY: The structure of CastlingRights is known
+        *unsafe {
+            ZOBRIST_MAP.castling_rights.0.get_unchecked(castling_rights.as_minimized_rights())
+        }
     }
 
     /// Generates the Zobrist hash for a piece at a given square. Used in [`zobrist::piece_table`].
