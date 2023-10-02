@@ -1,0 +1,20 @@
+[package]
+name = "hash-search"
+description = "AlphaZero-style MCTS system for the Hash Chess Engine"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hash-core = { path = "../hash-core" }
+hash-bootstrap = { path = "../hash-bootstrap" }
+
+arrayvec = "0.7.4"
+portable-atomic = { version = "1.4.3", features = ["float"] }
+
+rand = "0.8.5"
+
+[lints]
+workspace = true

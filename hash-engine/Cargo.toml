@@ -1,0 +1,16 @@
+[package]
+name = "hash-engine"
+description = "The Hash Chess Engine CLI"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hash-bootstrap = { path = "../hash-bootstrap" }
+hash-core = { path = "../hash-core" }
+hash-search = { path = "../hash-search" }
+
+[lints]
+workspace = true
