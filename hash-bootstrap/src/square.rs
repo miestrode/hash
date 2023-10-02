@@ -11,7 +11,7 @@ use crate::{bitboard::BitBoard, Color};
 /// Represents a square on the Chess board. To construct a square, use one of the constants (such
 /// as [`Square::A1`], [`Square::E4`], etc.). Alternatively some select functions return `Square`s,
 /// such as [`BitBoard::pop_first_one`].
-pub struct Square(pub(crate) u8);
+pub struct Square(pub u8);
 
 impl Square {
     /// Numeric value for the A file. Corresponds to values returned from [`Square::file`].
@@ -396,18 +396,17 @@ impl Square {
                 Some(LineKind::All)
             } else if a.rank() == b.rank() {
                 Some(LineKind::Vertical)
-            } else if
-            a.file() == b.file() {
+            } else if a.file() == b.file() {
                 Some(LineKind::Horizontal)
-            } else if a.file().abs_diff(b.file()) == a.rank().abs_diff(b.rank())
-            {
+            } else if a.file().abs_diff(b.file()) == a.rank().abs_diff(b.rank()) {
                 Some(LineKind::Diagonal)
             } else {
                 None
             }
         }
 
-        line_kind_with(start, end) == line_kind_with(end, *self) && line_kind_with(end, *self) == line_kind_with(*self, start)
+        line_kind_with(start, end) == line_kind_with(end, *self)
+            && line_kind_with(end, *self) == line_kind_with(*self, start)
     }
 
     /// Checks if the current square exists in the rectangle formed by the two passed squares `a`
@@ -441,14 +440,19 @@ impl Square {
             a.min(b) <= test && test <= a.max(b)
         }
 
-        between(self.file(), a.file(), b.file())
-            && between(self.rank(), a.rank(), b.rank())
+        between(self.file(), a.file(), b.file()) && between(self.rank(), a.rank(), b.rank())
     }
 }
 
 impl From<Square> for BitBoard {
     fn from(value: Square) -> Self {
         BitBoard(1 << value.0)
+    }
+}
+
+impl From<Option<Square>> for BitBoard {
+    fn from(value: Option<Square>) -> Self {
+        value.map_or(BitBoard::EMPTY, BitBoard::from)
     }
 }
 

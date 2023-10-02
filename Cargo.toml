@@ -6,7 +6,8 @@ lto = true
 inherits = "release"
 
 [workspace]
-members = ["hash-bootstrap", "hash"]
+members = ["hash-bootstrap", "hash-core", "hash-train", "hash-search", "hash-engine"]
+resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
@@ -14,4 +15,4 @@ authors = ["Yoav Grimland <miestrode@proton.me>"]
 edition = "2021"
 
 [workspace.lints.rust]
-unsafe_code_in_unsafe_fn = "deny"
+unsafe_op_in_unsafe_fn = "deny"

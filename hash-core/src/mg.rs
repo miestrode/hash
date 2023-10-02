@@ -9,10 +9,10 @@ use crate::{
 
 /// The maximum number of moves stored by [`Moves`]. This shouldn't be relevant for most
 /// cases - simply use [`Moves`].
-pub(crate) const MOVES: usize = 218;
+pub const MOVES: usize = 218;
 
 /// An array of moves that is the output of move generation ([`mg::gen_moves`]).
-pub(crate) type Moves = ArrayVec<Move, MOVES>;
+pub type Moves = ArrayVec<Move, MOVES>;
 
 trait CheckType {
     const IN_CHECK: bool;
@@ -40,7 +40,6 @@ trait Gen {
         color: Color,
     ) -> BitBoard;
 
-
     fn legal_moves<C: CheckType>(board: &Board, moves: &mut Moves) {
         let pieces = board.us.piece_bitboard(Self::PIECE_KIND);
         let occupation = board.occupation();
@@ -56,7 +55,11 @@ trait Gen {
             // doesn't include its edge points and for the cases where we don't have sliding piece
             // checking the king.
             // SAFETY: The board is assumed to be validly constructed
-            board.checkers ^ index::line_between(unsafe { Square::try_from(board.checkers).unwrap_unchecked() }, king_square)
+            board.checkers
+                ^ index::line_between(
+                    unsafe { Square::try_from(board.checkers).unwrap_unchecked() },
+                    king_square,
+                )
         } else {
             BitBoard::FULL
         };
@@ -80,18 +83,18 @@ trait Gen {
                     occupation,
                     board.playing_color,
                 ) & index::line_fit(king_square, piece))
-                    .bits()
-                    .map(move |target| Move {
-                        origin: piece,
-                        target,
-                        promotion: None,
-                    })
+                .bits()
+                .map(move |target| Move {
+                    origin: piece,
+                    target,
+                    promotion: None,
+                })
             }));
         }
     }
 }
 
-pub(crate) struct Pawn;
+pub struct Pawn;
 
 impl Pawn {
     unsafe fn is_legal_en_passant_capture(
@@ -110,13 +113,13 @@ impl Pawn {
         });
         occupation.toggle_bit(en_passant_capture_square);
 
-
         // SAFETY: Data passed and board are assumed to be valid
         let king_square = unsafe { Square::try_from(board.us.king).unwrap_unchecked() };
 
         // Test for any rays hitting the king
         ((index::bishop_slides(king_square, occupation) & (board.them.queens + board.them.bishops))
-            + (index::rook_slides(king_square, occupation) & (board.them.queens + board.them.rooks)))
+            + (index::rook_slides(king_square, occupation)
+                & (board.them.queens + board.them.rooks)))
             .is_empty()
     }
 }
@@ -138,7 +141,6 @@ impl Gen for Pawn {
         )
     }
 
-
     fn legal_moves<C: CheckType>(board: &Board, moves: &mut Moves) {
         let occupation = board.occupation();
 
@@ -153,7 +155,11 @@ impl Gen for Pawn {
             // doesn't include its edge points and for the cases where we don't have sliding piece
             // checking the king.
             // SAFETY: The board is assumed to be validly constructed
-            board.checkers ^ index::line_between(unsafe { Square::try_from(board.checkers).unwrap_unchecked() }, king_square)
+            board.checkers
+                ^ index::line_between(
+                    unsafe { Square::try_from(board.checkers).unwrap_unchecked() },
+                    king_square,
+                )
         } else {
             BitBoard::FULL
         };
@@ -229,13 +235,15 @@ impl Gen for Pawn {
         // En-passants
         unsafe {
             if let Some(en_passant_capture_square) = board.en_passant_capture_square {
-                for origin in index::pawn_attacks(en_passant_capture_square, !board.playing_color).bits() {
+                for origin in
+                    index::pawn_attacks(en_passant_capture_square, !board.playing_color).bits()
+                {
                     if board.us.pawns.get_bit(origin)
                         && Pawn::is_legal_en_passant_capture(
-                        board,
-                        en_passant_capture_square,
-                        origin,
-                    )
+                            board,
+                            en_passant_capture_square,
+                            origin,
+                        )
                     {
                         moves.push(Move {
                             origin,
@@ -249,11 +257,10 @@ impl Gen for Pawn {
     }
 }
 
-pub(crate) struct Knight;
+pub struct Knight;
 
 impl Gen for Knight {
     const PIECE_KIND: PieceKind = PieceKind::Knight;
-
 
     fn pseudo_legal_moves(
         origin: Square,
@@ -280,7 +287,11 @@ impl Gen for Knight {
             // Likewise we are adding the checker bitboard, as the line between the squares
             // doesn't include its edge points and for the cases where we don't have sliding piece
             // SAFETY: The board is assumed to be validly constructed
-            board.checkers ^ index::line_between(unsafe { Square::try_from(board.checkers).unwrap_unchecked() }, king_square)
+            board.checkers
+                ^ index::line_between(
+                    unsafe { Square::try_from(board.checkers).unwrap_unchecked() },
+                    king_square,
+                )
         } else {
             BitBoard::FULL
         };
@@ -298,11 +309,10 @@ impl Gen for Knight {
     }
 }
 
-pub(crate) struct Bishop;
+pub struct Bishop;
 
 impl Gen for Bishop {
     const PIECE_KIND: PieceKind = PieceKind::Bishop;
-
 
     fn pseudo_legal_moves(
         origin: Square,
@@ -314,11 +324,10 @@ impl Gen for Bishop {
     }
 }
 
-pub(crate) struct Rook;
+pub struct Rook;
 
 impl Gen for Rook {
     const PIECE_KIND: PieceKind = PieceKind::Rook;
-
 
     fn pseudo_legal_moves(
         origin: Square,
@@ -330,11 +339,10 @@ impl Gen for Rook {
     }
 }
 
-pub(crate) struct Queen;
+pub struct Queen;
 
 impl Gen for Queen {
     const PIECE_KIND: PieceKind = PieceKind::Queen;
-
 
     fn pseudo_legal_moves(
         origin: Square,
@@ -347,11 +355,10 @@ impl Gen for Queen {
     }
 }
 
-pub(crate) struct King;
+pub struct King;
 
 impl Gen for King {
     const PIECE_KIND: PieceKind = PieceKind::King;
-
 
     fn pseudo_legal_moves(
         origin: Square,
@@ -361,7 +368,6 @@ impl Gen for King {
     ) -> BitBoard {
         index::king_attacks(origin) - friendly_occupation
     }
-
 
     fn legal_moves<C: CheckType>(board: &Board, moves: &mut Moves) {
         // SAFETY: The board is assumed to be validly constructed
@@ -374,13 +380,13 @@ impl Gen for King {
                 board.occupation(),
                 board.playing_color,
             )
-                .bits()
-                .filter(|square| !board.is_attacked(*square))
-                .map(|target| Move {
-                    origin: king_square,
-                    target,
-                    promotion: None,
-                }),
+            .bits()
+            .filter(|square| !board.is_attacked(*square))
+            .map(|target| Move {
+                origin: king_square,
+                target,
+                promotion: None,
+            }),
         );
 
         // Castles
@@ -390,8 +396,8 @@ impl Gen for King {
             if board.us.castling_rights.can_castle_king_side()
                 && (king_side_castle_mask & board.occupation()).is_empty()
                 && (king_side_castle_mask
-                .bits()
-                .all(|square| !board.is_attacked(square)))
+                    .bits()
+                    .all(|square| !board.is_attacked(square)))
             {
                 moves.push(Move {
                     origin: king_square,
@@ -405,11 +411,11 @@ impl Gen for King {
 
             if board.us.castling_rights.can_castle_queen_side()
                 && (BitBoard::queen_side_castle_occupation_mask(board.playing_color)
-                & board.occupation())
+                    & board.occupation())
                 .is_empty()
                 && (BitBoard::queen_side_castle_attack_mask(board.playing_color)
-                .bits()
-                .all(|square| !board.is_attacked(square)))
+                    .bits()
+                    .all(|square| !board.is_attacked(square)))
             {
                 moves.push(Move {
                     origin: king_square,
@@ -423,7 +429,6 @@ impl Gen for King {
         }
     }
 }
-
 
 pub fn gen_moves(board: &Board) -> Moves {
     let mut moves = Moves::new();

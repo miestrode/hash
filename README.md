@@ -23,8 +23,7 @@ The primary things as of right now to be done, are:
 - [ ] Refactor the build script, and it's magic bitboards setup (consider using `phf`, and unrelatedly switching to
   black
   magic bitboards)
-- [ ] Create a testing suite
-- [ ] Start work on getting `lc0`'s networks to run in Rust
+- [x] Create a testing suite
 - [ ] Create an MCTS searcher using the networks (incorporating parallelism, Murphy Sampling and the like)
-- [ ] Create a network trainer in Rust, to replace the `lc0` networks
+- [ ] Create a network trainer in Rust
 - [ ] Create an evaluation framework, similar to FishTest or OpenBench

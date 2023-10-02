@@ -1,10 +1,6 @@
-use std::{
-    array,
-    fmt::Debug,
-    io::Error,
-};
+use std::{array, fmt::Debug, io::Error};
 
-use rand::{Rng, rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rustifact::ToTokenStream;
 
 use hash_bootstrap::{bb, BitBoard, Color, Square, ZobristMap};
@@ -373,16 +369,8 @@ fn main() -> Result<(), Error> {
         )?;
     }
 
-    rustifact::write_const_array!(
-        KNIGHT_ATTACKS,
-        BitBoard,
-        &gen_piece_table(gen_knight_index)
-    );
-    rustifact::write_const_array!(
-        KING_ATTACKS,
-        BitBoard,
-        &gen_piece_table(gen_king_index)
-    );
+    rustifact::write_const_array!(KNIGHT_ATTACKS, BitBoard, &gen_piece_table(gen_knight_index));
+    rustifact::write_const_array!(KING_ATTACKS, BitBoard, &gen_piece_table(gen_king_index));
 
     rustifact::write_const_array!(
         WHITE_PAWN_ATTACKS,
@@ -429,10 +417,10 @@ fn main() -> Result<(), Error> {
 
             square_as_bitboard.move_one_up(Color::Black)
                 + if square.rank() == 6 {
-                square_as_bitboard.move_two_up(Color::Black)
-            } else {
-                BitBoard::EMPTY
-            }
+                    square_as_bitboard.move_two_up(Color::Black)
+                } else {
+                    BitBoard::EMPTY
+                }
         })
     );
 
@@ -445,9 +433,7 @@ fn main() -> Result<(), Error> {
 
             Square::ALL
                 .into_iter()
-                .filter(|&square| {
-                    square.on_line(first_square, second_square)
-                })
+                .filter(|&square| square.on_line(first_square, second_square))
                 .map(BitBoard::from)
                 .fold(BitBoard::EMPTY, |board, square| board + square)
         })

@@ -1,7 +1,9 @@
 #[cfg(target_feature = "bmi2")]
 use std::arch::x86_64;
 
-use hash_bootstrap::{BitBoard, Color, Square, ZobristSide, ZobristCastlingRights, ZobristPieces, ZobristMap};
+use hash_bootstrap::{
+    BitBoard, Color, Square, ZobristCastlingRights, ZobristMap, ZobristPieces, ZobristSide,
+};
 
 #[derive(Clone, Copy)]
 struct Metadata {
@@ -63,7 +65,7 @@ rustifact::use_symbols!(
 /// Where the square marked with an `X` is where our rook is. Notice how the final output includes
 /// the squares of the blockers reachable by the rook. Likewise note how the blockers on the edges
 /// of the board didn't make any difference to the output.
-pub(crate) fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
+pub fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
     let metadata = CROSS_META[origin];
 
     *unsafe {
@@ -109,7 +111,7 @@ pub(crate) fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
 /// Where the square marked with an `X` is where our rook is. Notice how the final output includes
 /// the squares of the blockers reachable by the rook. Likewise note how the blockers on the edges
 /// of the board didn't make any difference to the output.
-pub(crate) fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
+pub fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
     let metadata = CROSS_META[origin];
     unsafe {
         *SLIDES.get_unchecked(
@@ -155,7 +157,7 @@ pub(crate) fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
 /// Where the square marked with an `X` is where our bishop is. Notice how the final output includes
 /// the squares of the blockers reachable by the bishop. Likewise note how the blockers on the edges
 /// of the board didn't make any difference to the output.
-pub(crate) fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
+pub fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
     let metadata = DIAGONAL_META[origin];
 
     *unsafe {
@@ -201,7 +203,7 @@ pub(crate) fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
 /// Where the square marked with an `X` is where our bishop is. Notice how the final output includes
 /// the squares of the blockers reachable by the bishop. Likewise note how the blockers on the edges
 /// of the board didn't make any difference to the output.
-pub(crate) fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
+pub fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
     let metadata = DIAGONAL_META[origin];
     unsafe {
         *SLIDES.get_unchecked(
@@ -227,7 +229,7 @@ pub(crate) fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
 ///     0b00000000
 /// ))
 /// ```
-pub(crate) fn knight_attacks(origin: Square) -> BitBoard {
+pub fn knight_attacks(origin: Square) -> BitBoard {
     KNIGHT_ATTACKS[origin]
 }
 
@@ -247,12 +249,12 @@ pub(crate) fn knight_attacks(origin: Square) -> BitBoard {
 ///     0b00010100
 /// ))
 /// ```
-pub(crate) fn king_attacks(origin: Square) -> BitBoard {
+pub fn king_attacks(origin: Square) -> BitBoard {
     KING_ATTACKS[origin]
 }
 
 /// Returns a bitboard of all squares that a pawn could attack if on the passed square.
-pub(crate) fn pawn_attacks(origin: Square, color: Color) -> BitBoard {
+pub fn pawn_attacks(origin: Square, color: Color) -> BitBoard {
     match color {
         Color::White => WHITE_PAWN_ATTACKS[origin],
         Color::Black => BLACK_PAWN_ATTACKS[origin],
@@ -312,7 +314,7 @@ pub fn pawn_moves(
 ///
 /// Note that the `X`s represent the squares, and would generally have `1`s on them
 /// (except in cases where there is no line fit).
-pub(crate) fn line_fit(a: Square, b: Square) -> BitBoard {
+pub fn line_fit(a: Square, b: Square) -> BitBoard {
     // SAFETY: This table is defined for each square-pair
     *unsafe { LINE.get_unchecked(a.as_index() * 64 + b.as_index()) }
 }
@@ -349,9 +351,9 @@ pub(crate) fn line_fit(a: Square, b: Square) -> BitBoard {
 ///
 /// Note that the `X`s represent the forming squares themselves, and these would never have `1`s
 /// in them, as the line doesn't include its edge points.
-pub(crate) fn line_between(a: Square, b: Square) -> BitBoard {
+pub fn line_between(a: Square, b: Square) -> BitBoard {
     // SAFETY: This table is defined for each square-pair
-    *unsafe {BETWEEN.get_unchecked(a.as_index() * 64 + b.as_index())}
+    *unsafe { BETWEEN.get_unchecked(a.as_index() * 64 + b.as_index()) }
 }
 
 /// Contains a variety of functions for generating Zobrist hashes for different parts of a board.
@@ -363,23 +365,23 @@ pub(crate) fn line_between(a: Square, b: Square) -> BitBoard {
 ///
 /// let combined_hash = white_king_rook ^ side_to_play;
 /// ```
-pub(crate) mod zobrist {
+pub mod zobrist {
     use hash_bootstrap::{Color, Square};
 
     use crate::repr::{CastlingRights, ColoredPieceTable, Piece, PieceKind};
 
     use super::ZOBRIST_MAP;
 
-    /// Generates the Zobrist hash for the given side. In a board this should be applied based on
+    /// Generates the Zobrist hash-core for the given side. In a board this should be applied based on
     /// the currently playing player.
-    pub(crate) fn side(color: Color) -> u64 {
+    pub fn side(color: Color) -> u64 {
         match color {
             Color::White => ZOBRIST_MAP.side.white_to_move,
             Color::Black => ZOBRIST_MAP.side.black_to_move,
         }
     }
 
-    /// Generates the Zobrist hash for the file an en-passant is available on a particular file.
+    /// Generates the Zobrist hash-core for the file an en-passant is available on a particular file.
     /// This is used to distinguish boards beyond their piece configuration.
     ///
     /// If there is no such file, this shouldn't be applied.
@@ -392,26 +394,29 @@ pub(crate) mod zobrist {
     ///
     /// # Panics
     /// This function panics if the passed file is invalid.
-    pub(crate) fn en_passant_file(file: u8) -> u64 {
+    pub fn en_passant_file(file: u8) -> u64 {
         ZOBRIST_MAP.ep_file[file as usize]
     }
 
-    /// Generates the Zobrist hash for the castling rights of a board, to distinguish boards
+    /// Generates the Zobrist hash-core for the castling rights of a board, to distinguish boards
     /// based on this.
-    pub(crate) fn castling_rights(castling_rights: &CastlingRights) -> u64 {
+    pub fn castling_rights(castling_rights: &CastlingRights) -> u64 {
         // SAFETY: The structure of CastlingRights is known
         *unsafe {
-            ZOBRIST_MAP.castling_rights.0.get_unchecked(castling_rights.as_minimized_rights())
+            ZOBRIST_MAP
+                .castling_rights
+                .0
+                .get_unchecked(castling_rights.as_minimized_rights())
         }
     }
 
-    /// Generates the Zobrist hash for a piece at a given square. Used in [`zobrist::piece_table`].
+    /// Generates the Zobrist hash-core for a piece at a given square. Used in [`zobrist::piece_table`].
     ///
     /// # Example
     /// ```ignore
     /// let black_king = zobrist::piece(Piece::BLACK_KING, Square::BLACK_KING);
     /// ```
-    pub(crate) fn piece(piece: Piece, square: Square) -> u64 {
+    pub fn piece(piece: Piece, square: Square) -> u64 {
         (match piece.kind {
             PieceKind::King => ZOBRIST_MAP.pieces.king,
             PieceKind::Queen => ZOBRIST_MAP.pieces.queen,
@@ -423,9 +428,9 @@ pub(crate) mod zobrist {
             .wrapping_mul(side(piece.color))
     }
 
-    /// Generates the Zobrist hash for a [`ColoredPieceTable`], by using [`zobrist::piece`] on each
+    /// Generates the Zobrist hash-core for a [`ColoredPieceTable`], by using [`zobrist::piece`] on each
     /// piece in the table individually.
-    pub(crate) fn piece_table(piece_table: &ColoredPieceTable) -> u64 {
+    pub fn piece_table(piece_table: &ColoredPieceTable) -> u64 {
         piece_table
             .pieces()
             .iter()
