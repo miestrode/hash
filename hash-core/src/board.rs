@@ -30,6 +30,11 @@ impl CacheHash for Board {
 }
 
 impl Board {
+    pub fn starting_position() -> Self {
+        // Taken from https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
+        Self::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
+    }
+
     pub fn is_attacked(&self, square: Square) -> bool {
         let mut attackers = BitBoard::EMPTY;
         let occupation = self.occupation() - self.us.king;
@@ -477,12 +482,5 @@ impl Display for Board {
             " {} {}",
             self.min_half_move_clock, self.full_moves
         ))
-    }
-}
-
-impl Default for Board {
-    fn default() -> Self {
-        // Taken from https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
-        Self::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
     }
 }

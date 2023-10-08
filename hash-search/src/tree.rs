@@ -1,36 +1,69 @@
 use crate::{Network, NetworkResult, Selector};
-use arrayvec::ArrayVec;
-use hash_core::{board::Board, mg};
+use hash_core::{board::Board, mg, repr::Move};
 use std::{cell::Cell, ops::Deref};
 
-// This is essentially the maximum depth of the tree search
-const HISTORY_CAPACITY: usize = 20;
-
 pub struct Child {
-    pub tree: Box<Tree>,
+    pub tree: Tree,
     pub probability: f32,
 }
 
-pub type Children = ArrayVec<Child, { mg::MOVES }>;
+impl Child {
+    pub fn new(board: Board, probability: f32) -> Self {
+        Self {
+            tree: Tree::new(board),
+            probability,
+        }
+    }
+}
+
+pub type Children = Box<[Child]>;
 
 pub struct Tree {
-    pub board: Board,
-    pub value_sum: Cell<f32>,
-    pub visits: Cell<u16>,
-    pub children: Cell<Option<Children>>,
+    board: Board,
+    value_sum: Cell<f32>,
+    visits: Cell<u16>,
+    children: Cell<Option<Children>>,
 }
 
 impl Tree {
-    fn expanded(&self) -> bool {
-        // SAFETY: We don't mutate in here anything.
-        unsafe { self.children.as_ptr().as_ref().is_some() }
+    pub fn new(board: Board) -> Self {
+        Self {
+            board,
+            value_sum: Cell::new(0.0),
+            visits: Cell::new(0),
+            children: Cell::new(None),
+        }
     }
 
-    fn expand<S: Selector, N: Network>(&mut self, selector: &mut S, network: &N)
-    where
-        [(); N::MOVE_HISTORY]: Sized,
-    {
-        let mut node_progression = ArrayVec::<_, HISTORY_CAPACITY>::from_iter([self.deref()]);
+    pub fn best_move(&self) -> Move {
+        self.children()
+            .unwrap()
+            .iter()
+            .zip(mg::gen_moves(&self.board))
+            .max_by_key(|(child, _)| child.tree.visits())
+            .unwrap()
+            .1
+    }
+
+    pub fn value_sum(&self) -> f32 {
+        self.value_sum.get()
+    }
+
+    pub fn visits(&self) -> u16 {
+        self.visits.get()
+    }
+
+    pub fn children(&self) -> Option<&Children> {
+        // SAFETY: Operations that modify the children require unique access
+        unsafe { self.children.as_ptr().as_ref().unwrap() }.as_ref()
+    }
+
+    fn expanded(&self) -> bool {
+        self.children().is_some()
+    }
+
+    pub fn expand<S: Selector, N: Network>(&mut self, selector: &mut S, network: &N) {
+        let mut node_progression = vec![self.deref()];
 
         let node_to_expand = loop {
             let current_node = node_progression.last().unwrap();
@@ -46,7 +79,9 @@ impl Tree {
             mut value,
             move_probabilities,
         } = network.run(
-            node_progression[(node_progression.len() - N::MOVE_HISTORY)..]
+            node_progression[node_progression
+                .len()
+                .saturating_sub(network.maximum_boards_expected())..]
                 .iter()
                 .map(|tree| tree.board)
                 .collect(),
@@ -56,14 +91,8 @@ impl Tree {
             node_to_expand
                 .board
                 .gen_child_boards()
-                .map(|(chess_move, board)| Child {
-                    tree: Box::new(Tree {
-                        board,
-                        value_sum: Cell::new(0.0),
-                        visits: Cell::new(0),
-                        children: Cell::new(None),
-                    }),
-                    probability: move_probabilities.probability(chess_move),
+                .map(|(chess_move, board)| {
+                    Child::new(board, move_probabilities.probability(chess_move))
                 })
                 .collect(),
         ));

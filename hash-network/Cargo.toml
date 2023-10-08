@@ -1,6 +1,5 @@
 [package]
-name = "hash-search"
-description = "AlphaZero-style MCTS system for the Hash Chess Engine"
+name = "hash-network"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -8,16 +7,10 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hash-core = { path = "../hash-core" }
 hash-bootstrap = { path = "../hash-bootstrap" }
-hash-network = { path = "../hash-network" }
-
-arrayvec = "0.7.4"
-num-traits = "0.2.16"
-rand = { version = "0.8.5", features = ["min_const_gen"] }
+hash-core = { path = "../hash-core" }
 
 burn = "0.9.0"
-burn-ndarray = "0.9.0"
 serde = "1.0.188"
 
 [lints]

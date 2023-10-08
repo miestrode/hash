@@ -6,7 +6,7 @@ lto = true
 inherits = "release"
 
 [workspace]
-members = ["hash-bootstrap", "hash-core", "hash-train", "hash-search", "hash-engine"]
+members = ["hash-bootstrap", "hash-core", "hash-train", "hash-search", "hash-engine", "hash-network"]
 resolver = "2"
 
 [workspace.package]

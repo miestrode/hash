@@ -18,7 +18,7 @@ mod tests {
 
     #[bench]
     fn bench_perft_default_1(b: &mut Bencher) {
-        let board = Board::default();
+        let board = Board::starting_position();
 
         b.iter(|| board.perft(5));
     }

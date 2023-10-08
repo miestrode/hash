@@ -1,37 +1,19 @@
-#![feature(cell_update, generic_const_exprs)]
+#![feature(cell_update)]
 
 use crate::tree::Tree;
-use arrayvec::ArrayVec;
 use hash_bootstrap::Square;
 use hash_core::{
     board::Board,
     repr::{Move, PieceKind},
 };
-use rand::Rng;
 
+mod network;
+mod puct;
+pub mod search;
 mod tree;
 
 trait Selector {
     fn choose_child<'a>(&mut self, tree: &'a Tree) -> Option<&'a Tree>;
-}
-
-pub struct SimplePolicy;
-
-impl Selector for SimplePolicy {
-    fn choose_child<'a>(&mut self, tree: &'a Tree) -> Option<&'a Tree> {
-        // SAFETY: We don't mutate anything.
-        unsafe { tree.children.as_ptr().as_ref() }
-            .unwrap()
-            .as_ref()
-            .map(|children| {
-                children
-                    .iter()
-                    .max_by(|child_a, child_b| child_a.probability.total_cmp(&child_b.probability))
-                    .unwrap()
-                    .tree
-                    .as_ref()
-            })
-    }
 }
 
 pub struct MoveProbabilities {
@@ -79,22 +61,7 @@ pub struct NetworkResult {
 }
 
 pub trait Network {
-    const MOVE_HISTORY: usize;
+    fn maximum_boards_expected(&self) -> usize;
 
-    fn run(&self, boards: ArrayVec<Board, { Self::MOVE_HISTORY }>) -> NetworkResult;
-}
-
-pub struct SimpleNetwork;
-
-impl Network for SimpleNetwork {
-    const MOVE_HISTORY: usize = 1;
-
-    fn run(&self, _boards: ArrayVec<Board, { Self::MOVE_HISTORY }>) -> NetworkResult {
-        NetworkResult {
-            value: rand::thread_rng().gen_range(-1.0..1.0),
-            move_probabilities: MoveProbabilities {
-                probabilities: rand::random(),
-            },
-        }
-    }
+    fn run(&self, boards: Vec<Board>) -> NetworkResult;
 }

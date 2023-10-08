@@ -16,14 +16,13 @@ to do well currently, using Rust. Some areas may suffer, or just won't use Rust 
 
 The primary things as of right now to be done, are:
 
-- [x] Restructure the project (combine `hash-core`, `hash-search`, `hash-eval` and `hash-cli`)
-- [x] Finish the move generation refactor
+- [ ] Make the FEN parser fail when the board it is parsing is illegal, as `Board` should never, whilst only using safe
+  functions result in an invalid position.
 - [ ] Try to reimplement the `Pins` data structure and other ideas from the old move generation code. It is possible
   that reimplementing the generation of slide constraints could make it a viable, fast option again.
 - [ ] Refactor the build script, and it's magic bitboards setup (consider using `phf`, and unrelatedly switching to
   black
   magic bitboards)
-- [x] Create a testing suite
 - [ ] Create an MCTS searcher using the networks (incorporating parallelism, Murphy Sampling and the like)
 - [ ] Create a network trainer in Rust
 - [ ] Create an evaluation framework, similar to FishTest or OpenBench
