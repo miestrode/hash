@@ -13,12 +13,10 @@ hash-bootstrap = { path = "../hash-bootstrap" }
 hash-network = { path = "../hash-network" }
 
 arrayvec = "0.7.4"
-num-traits = "0.2.16"
+num-traits = "0.2.17"
 rand = { version = "0.8.5", features = ["min_const_gen"] }
-
-burn = "0.9.0"
-burn-ndarray = "0.9.0"
-serde = "1.0.188"
+burn = { version = "0.9.0", features = ["ndarray-blas-openblas-system"] }
+serde = "1.0.189"
 
 [lints]
 workspace = true

@@ -5,7 +5,9 @@ use hash_core::{board::Board, repr::Player};
 
 pub mod model;
 
-fn stack<B: Backend, const D: usize, const D2: usize>(tensors: Vec<Tensor<B, D>>) -> Tensor<B, D2> {
+pub fn stack<B: Backend, const D: usize, const D2: usize>(
+    tensors: Vec<Tensor<B, D>>,
+) -> Tensor<B, D2> {
     Tensor::cat(
         tensors
             .into_iter()
@@ -55,7 +57,7 @@ pub fn board_to_tensor<B: Backend>(board: Option<&Board>) -> Tensor<B, 3> {
                     Color::Black => Tensor::ones(Shape::new([8, 8])).neg(),
                 }
                 .unsqueeze(),
-                Tensor::from_floats([board.min_half_move_clock as f32; 64])
+                Tensor::from_floats([board.min_ply_clock as f32; 64])
                     .reshape(Shape::new([1, 8, 8])),
                 boolean_to_tensor(true).unsqueeze(), // This is for the existence layer
             ],
@@ -66,6 +68,8 @@ pub fn board_to_tensor<B: Backend>(board: Option<&Board>) -> Tensor<B, 3> {
     }
 }
 
+// TODO: It might be the best to just fill the rest with zeroes on the tensor level, instead of
+// requiring one to pass a bunch of zeros
 pub fn boards_to_tensor<B: Backend>(boards: Vec<Option<&Board>>) -> Tensor<B, 3> {
     stack(
         boards

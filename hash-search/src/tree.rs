@@ -1,28 +1,32 @@
-use crate::{Network, NetworkResult, Selector};
+use crate::network::{Network, NetworkResult};
 use hash_core::{board::Board, mg, repr::Move};
 use std::{cell::Cell, ops::Deref};
 
 pub struct Child {
     pub tree: Tree,
     pub probability: f32,
+    pub chess_move: Move,
 }
 
 impl Child {
-    pub fn new(board: Board, probability: f32) -> Self {
+    pub fn new(board: Board, probability: f32, chess_move: Move) -> Self {
         Self {
             tree: Tree::new(board),
             probability,
+            chess_move,
         }
     }
 }
 
-pub type Children = Box<[Child]>;
-
 pub struct Tree {
-    board: Board,
+    pub board: Board,
     value_sum: Cell<f32>,
     visits: Cell<u16>,
-    children: Cell<Option<Children>>,
+    children: Cell<Option<Box<[Child]>>>,
+}
+
+pub trait Selector {
+    fn choose_child<'a>(&mut self, tree: &'a Tree) -> Option<&'a Tree>;
 }
 
 impl Tree {
@@ -36,7 +40,7 @@ impl Tree {
     }
 
     pub fn best_move(&self) -> Move {
-        self.children()
+        self.children_ref()
             .unwrap()
             .iter()
             .zip(mg::gen_moves(&self.board))
@@ -53,13 +57,19 @@ impl Tree {
         self.visits.get()
     }
 
-    pub fn children(&self) -> Option<&Children> {
+    pub fn children(self) -> Option<Box<[Child]>> {
+        self.children.into_inner()
+    }
+
+    pub fn children_ref(&self) -> Option<&[Child]> {
         // SAFETY: Operations that modify the children require unique access
-        unsafe { self.children.as_ptr().as_ref().unwrap() }.as_ref()
+        unsafe { self.children.as_ptr().as_ref().unwrap() }
+            .as_ref()
+            .map(|child| child.as_ref())
     }
 
     fn expanded(&self) -> bool {
-        self.children().is_some()
+        self.children_ref().is_some()
     }
 
     pub fn expand<S: Selector, N: Network>(&mut self, selector: &mut S, network: &N) {
@@ -92,7 +102,11 @@ impl Tree {
                 .board
                 .gen_child_boards()
                 .map(|(chess_move, board)| {
-                    Child::new(board, move_probabilities.probability(chess_move))
+                    Child::new(
+                        board,
+                        move_probabilities.get_probability(chess_move),
+                        chess_move,
+                    )
                 })
                 .collect(),
         ));

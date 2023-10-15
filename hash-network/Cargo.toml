@@ -9,7 +9,6 @@ edition.workspace = true
 [dependencies]
 hash-bootstrap = { path = "../hash-bootstrap" }
 hash-core = { path = "../hash-core" }
-
 burn = "0.9.0"
 serde = "1.0.188"
 

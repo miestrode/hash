@@ -5,7 +5,7 @@ use burn::{
         conv::{Conv2d, Conv2dConfig},
         BatchNorm, BatchNormConfig, Linear, LinearConfig, PaddingConfig2d, ReLU,
     },
-    tensor::{backend::Backend, Tensor},
+    tensor::{activation, backend::Backend, Shape, Tensor},
 };
 use std::iter;
 
@@ -86,6 +86,11 @@ impl ConvBlockConfig {
     }
 }
 
+pub struct BatchOutput<B: Backend> {
+    pub values: Tensor<B, 1>,
+    pub probabilities: Tensor<B, 2>,
+}
+
 #[derive(Module, Debug)]
 pub struct Model<B: Backend> {
     move_history: usize,
@@ -99,15 +104,25 @@ impl<B: Backend> Model<B> {
         self.move_history
     }
 
-    pub fn forward(&self, input: Tensor<B, 4>) -> Tensor<B, 2> {
+    pub fn forward(&self, input: Tensor<B, 4>) -> BatchOutput<B> {
         let x = self
             .conv_blocks
             .iter()
             .fold(input, |x, block| block.forward(x));
         let x = x.flatten(1, 3);
         let x = self.fc_1.forward(x);
+        let x = self.output.forward(x);
 
-        self.output.forward(x)
+        let shape = x.shape().dims;
+        let value_index_tensor = Tensor::zeros(Shape::new([shape[0], 1]));
+
+        let values = x.clone().gather(1, value_index_tensor.clone()).squeeze(1);
+        let probabilities = activation::softmax(x.slice([0..shape[0], 1..shape[1]]), 1);
+
+        BatchOutput {
+            values,
+            probabilities,
+        }
     }
 }
 
@@ -121,7 +136,7 @@ pub struct ModelConfig {
     move_history: usize,
     #[config(default = 3)]
     kernel_length: usize,
-    #[config(default = 256)]
+    #[config(default = 32)]
     filters: usize,
 }
 

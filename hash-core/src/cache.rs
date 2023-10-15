@@ -1,3 +1,5 @@
+use std::{array, marker::PhantomData};
+
 pub trait CacheHash {
     fn hash(&self) -> u64;
 }
@@ -11,27 +13,28 @@ struct Entry<T> {
 impl<T: Copy> Copy for Entry<T> {}
 
 #[derive(Clone)]
-pub struct Cache<T: Clone, const N: usize> {
-    data: [Option<Entry<T>>; N],
+pub struct Cache<K: CacheHash, V, const N: usize> {
+    data: [Option<Entry<V>>; N],
+    _marker: PhantomData<K>,
 }
 
-impl<T: Clone, const N: usize> Cache<T, N> {
+impl<K: CacheHash, V, const N: usize> Cache<K, V, N> {
     // TODO: Rework this implementation to be less simple. The replacement strategy shown here
     // should be tweaked to be more balanced, and of course, fixed-probing should be explored
     // (probing up to some number H of buckets, and then simply replacing)
-    pub fn insert<K: CacheHash>(&mut self, key: &K, value: T) {
+    pub fn insert(&mut self, key: &K, value: V) {
         let hash = key.hash();
 
         self.data[hash as usize % N] = Some(Entry { value, hash });
     }
 
-    pub fn get<K: CacheHash>(&self, key: &K) -> Option<T> {
+    pub fn get(&self, key: &K) -> Option<&V> {
         let hash = key.hash();
         let entry = &self.data[hash as usize % self.data.len()];
 
         entry.as_ref().and_then(|entry| {
             if entry.hash == hash {
-                Some(entry.value.clone())
+                Some(&entry.value)
             } else {
                 None
             }
@@ -39,16 +42,17 @@ impl<T: Clone, const N: usize> Cache<T, N> {
     }
 }
 
-impl<T: Copy, const N: usize> Cache<T, N> {
+impl<K: CacheHash, V, const N: usize> Cache<K, V, N> {
     pub fn new() -> Self {
-        Self { data: [None; N] }
+        Self {
+            data: array::from_fn(|_| None),
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<T: Copy, const N: usize> Default for Cache<T, N> {
+impl<K: CacheHash, V, const N: usize> Default for Cache<K, V, N> {
     fn default() -> Self {
         Self::new()
     }
 }
-
-impl<T: Copy, const N: usize> Copy for Cache<T, N> {}

@@ -18,7 +18,7 @@ pub struct Board {
     pub playing_color: Color,
     pub en_passant_capture_square: Option<Square>,
     pub piece_table: PieceTable,
-    pub min_half_move_clock: u8,
+    pub min_ply_clock: u8,
     pub full_moves: u16,
     pub hash: u64,
 }
@@ -257,10 +257,10 @@ impl Board {
 
         self.full_moves += (self.playing_color == Color::Black) as u16;
 
-        self.min_half_move_clock = if moved_piece_kind == PieceKind::Pawn || is_capture {
+        self.min_ply_clock = if moved_piece_kind == PieceKind::Pawn || is_capture {
             0
         } else {
-            self.min_half_move_clock.saturating_add(1)
+            self.min_ply_clock.saturating_add(1)
         };
 
         self.playing_color = !self.playing_color;
@@ -316,9 +316,9 @@ impl FromStr for Board {
                 square => Some(Square::from_str(square)?),
             };
 
-            let half_move_clock = parts[4]
+            let ply_clock = parts[4]
                 .parse::<u8>()
-                .map_err(|_| "Input contains invalid number for the half move clock")?;
+                .map_err(|_| "Input contains invalid number for the half-move clock")?;
 
             let full_moves = parts[5]
                 .parse::<u16>()
@@ -390,7 +390,7 @@ impl FromStr for Board {
                     ^ zobrist::castling_rights(&black.castling_rights),
                 checkers: BitBoard::EMPTY,
                 pinned: BitBoard::EMPTY,
-                min_half_move_clock: half_move_clock,
+                min_ply_clock: ply_clock,
                 full_moves,
             };
 
@@ -478,9 +478,6 @@ impl Display for Board {
         } else {
             '-'.fmt(f)?;
         }
-        f.write_fmt(format_args!(
-            " {} {}",
-            self.min_half_move_clock, self.full_moves
-        ))
+        f.write_fmt(format_args!(" {} {}", self.min_ply_clock, self.full_moves))
     }
 }

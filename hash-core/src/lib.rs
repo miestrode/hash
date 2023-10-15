@@ -1,7 +1,8 @@
-#![feature(test, custom_test_frameworks)]
+#![feature(test)]
 
 pub mod board;
 mod cache;
+pub mod game;
 mod index;
 pub mod mg;
 pub mod repr;

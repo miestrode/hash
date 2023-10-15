@@ -14,7 +14,7 @@ to do well currently, using Rust. Some areas may suffer, or just won't use Rust 
 
 ## To do
 
-The primary things as of right now to be done, are:
+### Move generation (`hash-core`)
 
 - [ ] Make the FEN parser fail when the board it is parsing is illegal, as `Board` should never, whilst only using safe
   functions result in an invalid position.
@@ -23,6 +23,14 @@ The primary things as of right now to be done, are:
 - [ ] Refactor the build script, and it's magic bitboards setup (consider using `phf`, and unrelatedly switching to
   black
   magic bitboards)
+
+### MCTS
+
 - [ ] Create an MCTS searcher using the networks (incorporating parallelism, Murphy Sampling and the like)
+- [ ] Consider not tying a board to the tree, saving memory
+- [ ] Consider to the contrary tying the relevant move to each child, or at least a move integer.
+
+### Network training
+
 - [ ] Create a network trainer in Rust
 - [ ] Create an evaluation framework, similar to FishTest or OpenBench

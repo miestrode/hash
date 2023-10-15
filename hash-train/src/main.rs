@@ -1,3 +1,5 @@
+use burn::{autodiff::ADBackendDecorator, backend::TchBackend};
+
 fn main() {
-    println!("Hello, world!");
+    hash_train::train::run::<ADBackendDecorator<TchBackend<f32>>>();
 }

@@ -1,14 +1,11 @@
-use crate::{
-    tree::{Child, Tree},
-    Selector,
-};
+use crate::tree::{Child, Selector, Tree};
 
 pub struct PuctSelector {
     exploration_rate: f32,
 }
 
 impl PuctSelector {
-    pub(crate) fn new(exploration_rate: f32) -> Self {
+    pub fn new(exploration_rate: f32) -> Self {
         Self { exploration_rate }
     }
 
@@ -20,7 +17,7 @@ impl PuctSelector {
 
 impl Selector for PuctSelector {
     fn choose_child<'a>(&mut self, tree: &'a Tree) -> Option<&'a Tree> {
-        tree.children()
+        tree.children_ref()
             .and_then(|children| {
                 children
                     .iter()

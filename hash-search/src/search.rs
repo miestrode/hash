@@ -1,5 +1,5 @@
 use crate::{puct::PuctSelector, tree::Tree};
-use burn_ndarray::NdArrayBackend;
+use burn::backend::NdArrayBackend;
 use hash_core::{board::Board, repr::Move};
 use hash_network::model::ModelConfig;
 
