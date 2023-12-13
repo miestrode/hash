@@ -36,7 +36,9 @@ When castling, the origin and target squares used are those of the king. This me
 #### En passants
 For en passants, the origin and target squares used are those of the pawn performing the capture. Therefore, for the following board:
 
-![A white pawn on E5, about to en passant a pawn on D5](../../assets/docs/cego/REVISION-1/En passant.png)
+<p align="center">
+  <img width="500" height="500" alt="A white pawn on E5, about to en passant a pawn on D5" src="../../assets/docs/cego/REVISION-1/En passant.png">
+</p>
 
 the highlighted move will be `e5d6`.
 
