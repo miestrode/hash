@@ -149,13 +149,13 @@ impl Display for Piece {
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// Represents a move in the game of Chess. To create a move one can use [`Board::interpret_move`].
-pub struct Move {
+pub struct ChessMove {
     pub origin: Square,
     pub target: Square,
     pub promotion: Option<PieceKind>,
 }
 
-impl Display for Move {
+impl Display for ChessMove {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.origin.fmt(f)?;
         self.target.fmt(f)?;
@@ -168,7 +168,7 @@ impl Display for Move {
     }
 }
 
-impl FromStr for Move {
+impl FromStr for ChessMove {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -186,7 +186,7 @@ impl FromStr for Move {
                 None
             };
 
-            Ok(Move {
+            Ok(ChessMove {
                 origin,
                 target,
                 promotion,

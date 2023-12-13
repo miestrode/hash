@@ -5,32 +5,23 @@ use hash_core::{board::Board, repr::Player};
 
 pub mod model;
 
-pub fn stack<B: Backend, const D: usize, const D2: usize>(
-    tensors: Vec<Tensor<B, D>>,
-) -> Tensor<B, D2> {
-    Tensor::cat(
-        tensors
-            .into_iter()
-            .map(|tensor| tensor.unsqueeze())
-            .collect(),
-        0,
-    )
-}
-
 fn bitboard_to_tensor<B: Backend>(bitboard: BitBoard) -> Tensor<B, 2> {
     Tensor::from_floats((Square::ALL).map(|square| f32::from(bitboard.get_bit(square))))
         .reshape(Shape::new([8, 8]))
 }
 
 fn player_to_tensor<B: Backend>(player: &Player) -> Tensor<B, 3> {
-    stack(vec![
-        bitboard_to_tensor(player.pawns),
-        bitboard_to_tensor(player.knights),
-        bitboard_to_tensor(player.bishops),
-        bitboard_to_tensor(player.rooks),
-        bitboard_to_tensor(player.queens),
-        bitboard_to_tensor(player.king),
-    ])
+    Tensor::stack(
+        vec![
+            bitboard_to_tensor(player.pawns),
+            bitboard_to_tensor(player.knights),
+            bitboard_to_tensor(player.bishops),
+            bitboard_to_tensor(player.rooks),
+            bitboard_to_tensor(player.queens),
+            bitboard_to_tensor(player.king),
+        ],
+        0,
+    )
 }
 
 fn boolean_to_tensor<B: Backend>(boolean: bool) -> Tensor<B, 2> {
@@ -71,11 +62,12 @@ pub fn board_to_tensor<B: Backend>(board: Option<&Board>) -> Tensor<B, 3> {
 // TODO: It might be the best to just fill the rest with zeroes on the tensor level, instead of
 // requiring one to pass a bunch of zeros
 pub fn boards_to_tensor<B: Backend>(boards: Vec<Option<&Board>>) -> Tensor<B, 3> {
-    stack(
+    Tensor::cat(
         boards
             .iter()
             .copied()
             .map(|board| board_to_tensor(board))
             .collect(),
+        0,
     )
 }

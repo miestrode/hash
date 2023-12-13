@@ -4,7 +4,7 @@ use hash_bootstrap::{BitBoard, Color, Square};
 use crate::{
     board::Board,
     index,
-    repr::{Move, PieceKind},
+    repr::{ChessMove, PieceKind},
 };
 
 /// The maximum number of moves stored by [`Moves`]. This shouldn't be relevant for most
@@ -12,7 +12,7 @@ use crate::{
 pub const MOVES: usize = 218;
 
 /// An array of moves that is the output of move generation ([`mg::gen_moves`]).
-pub type Moves = ArrayVec<Move, MOVES>;
+pub type Moves = ArrayVec<ChessMove, MOVES>;
 
 trait CheckType {
     const IN_CHECK: bool;
@@ -68,7 +68,7 @@ trait Gen {
             (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
                 & valid_targets)
                 .bits()
-                .map(move |target| Move {
+                .map(move |target| ChessMove {
                     origin: piece,
                     target,
                     promotion: None,
@@ -84,7 +84,7 @@ trait Gen {
                     board.playing_color,
                 ) & index::line_fit(king_square, piece))
                 .bits()
-                .map(move |target| Move {
+                .map(move |target| ChessMove {
                     origin: piece,
                     target,
                     promotion: None,
@@ -173,7 +173,7 @@ impl Gen for Pawn {
             ) & valid_targets)
                 - BitBoard::EDGE_RANKS)
                 .bits()
-                .map(move |target| Move {
+                .map(move |target| ChessMove {
                     origin: piece,
                     target,
                     promotion: None,
@@ -187,11 +187,13 @@ impl Gen for Pawn {
                 & BitBoard::EDGE_RANKS)
                 .bits()
                 .flat_map(move |target| {
-                    PieceKind::PROMOTIONS.into_iter().map(move |kind| Move {
-                        origin: piece,
-                        target,
-                        promotion: Some(kind),
-                    })
+                    PieceKind::PROMOTIONS
+                        .into_iter()
+                        .map(move |kind| ChessMove {
+                            origin: piece,
+                            target,
+                            promotion: Some(kind),
+                        })
                 })
         }));
 
@@ -205,7 +207,7 @@ impl Gen for Pawn {
                 ) & index::line_fit(king_square, piece))
                     - BitBoard::EDGE_RANKS)
                     .bits()
-                    .map(move |target| Move {
+                    .map(move |target| ChessMove {
                         origin: piece,
                         target,
                         promotion: None,
@@ -223,11 +225,13 @@ impl Gen for Pawn {
                     & BitBoard::EDGE_RANKS)
                     .bits()
                     .flat_map(move |target| {
-                        PieceKind::PROMOTIONS.into_iter().map(move |kind| Move {
-                            origin: piece,
-                            target,
-                            promotion: Some(kind),
-                        })
+                        PieceKind::PROMOTIONS
+                            .into_iter()
+                            .map(move |kind| ChessMove {
+                                origin: piece,
+                                target,
+                                promotion: Some(kind),
+                            })
                     })
             }));
         }
@@ -245,7 +249,7 @@ impl Gen for Pawn {
                             origin,
                         )
                     {
-                        moves.push(Move {
+                        moves.push(ChessMove {
                             origin,
                             target: en_passant_capture_square,
                             promotion: None,
@@ -300,7 +304,7 @@ impl Gen for Knight {
             (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
                 & valid_targets)
                 .bits()
-                .map(move |target| Move {
+                .map(move |target| ChessMove {
                     origin: piece,
                     target,
                     promotion: None,
@@ -382,7 +386,7 @@ impl Gen for King {
             )
             .bits()
             .filter(|square| !board.is_attacked(*square))
-            .map(|target| Move {
+            .map(|target| ChessMove {
                 origin: king_square,
                 target,
                 promotion: None,
@@ -399,7 +403,7 @@ impl Gen for King {
                     .bits()
                     .all(|square| !board.is_attacked(square)))
             {
-                moves.push(Move {
+                moves.push(ChessMove {
                     origin: king_square,
                     target: match board.playing_color {
                         Color::White => Square::G1,
@@ -417,7 +421,7 @@ impl Gen for King {
                     .bits()
                     .all(|square| !board.is_attacked(square)))
             {
-                moves.push(Move {
+                moves.push(ChessMove {
                     origin: king_square,
                     target: match board.playing_color {
                         Color::White => Square::C1,

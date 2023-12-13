@@ -1,15 +1,15 @@
 use crate::network::{Network, NetworkResult};
-use hash_core::{board::Board, mg, repr::Move};
+use hash_core::{board::Board, mg, repr::ChessMove};
 use std::{cell::Cell, ops::Deref};
 
 pub struct Child {
     pub tree: Tree,
     pub probability: f32,
-    pub chess_move: Move,
+    pub chess_move: ChessMove,
 }
 
 impl Child {
-    pub fn new(board: Board, probability: f32, chess_move: Move) -> Self {
+    pub fn new(board: Board, probability: f32, chess_move: ChessMove) -> Self {
         Self {
             tree: Tree::new(board),
             probability,
@@ -22,11 +22,11 @@ pub struct Tree {
     pub board: Board,
     value_sum: Cell<f32>,
     visits: Cell<u16>,
-    children: Cell<Option<Box<[Child]>>>,
+    children: Cell<Option<Vec<Child>>>,
 }
 
 pub trait Selector {
-    fn choose_child<'a>(&mut self, tree: &'a Tree) -> Option<&'a Tree>;
+    fn choose_child<'a>(&mut self, children: impl Iterator<Item = &'a Child>) -> Option<&'a Tree>;
 }
 
 impl Tree {
@@ -39,7 +39,7 @@ impl Tree {
         }
     }
 
-    pub fn best_move(&self) -> Move {
+    pub fn best_move(&self) -> ChessMove {
         self.children_ref()
             .unwrap()
             .iter()
@@ -57,7 +57,7 @@ impl Tree {
         self.visits.get()
     }
 
-    pub fn children(self) -> Option<Box<[Child]>> {
+    pub fn children(self) -> Option<Vec<Child>> {
         self.children.into_inner()
     }
 
@@ -68,7 +68,7 @@ impl Tree {
             .map(|child| child.as_ref())
     }
 
-    fn expanded(&self) -> bool {
+    fn is_expanded(&self) -> bool {
         self.children_ref().is_some()
     }
 
@@ -78,11 +78,20 @@ impl Tree {
         let node_to_expand = loop {
             let current_node = node_progression.last().unwrap();
 
-            if !current_node.expanded() {
+            if !current_node.is_expanded() {
                 break *current_node;
             }
 
-            node_progression.push(selector.choose_child(current_node).unwrap());
+            node_progression.push(
+                selector
+                    .choose_child(current_node.children_ref().unwrap().iter().filter(|child| {
+                        child
+                            .tree
+                            .children_ref()
+                            .map_or(true, |tree| !tree.is_empty())
+                    }))
+                    .unwrap(),
+            );
         };
 
         let NetworkResult {

@@ -16,13 +16,9 @@ impl PuctSelector {
 }
 
 impl Selector for PuctSelector {
-    fn choose_child<'a>(&mut self, tree: &'a Tree) -> Option<&'a Tree> {
-        tree.children_ref()
-            .and_then(|children| {
-                children
-                    .iter()
-                    .max_by(|child_a, child_b| self.puct(child_a).total_cmp(&self.puct(child_b)))
-            })
+    fn choose_child<'a>(&mut self, children: impl Iterator<Item = &'a Child>) -> Option<&'a Tree> {
+        children
+            .max_by(|child_a, child_b| self.puct(child_a).total_cmp(&self.puct(child_b)))
             .map(|child| &child.tree)
     }
 }

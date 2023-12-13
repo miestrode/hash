@@ -2,7 +2,7 @@ use burn::tensor::{backend::Backend, Tensor};
 use hash_bootstrap::Square;
 use hash_core::{
     board::Board,
-    repr::{Move, PieceKind},
+    repr::{ChessMove, PieceKind},
 };
 use hash_network::model::{BatchOutput, Model};
 use num_traits::ToPrimitive;
@@ -22,7 +22,7 @@ impl MoveProbabilities {
     const ARRAY_LENGTH: usize =
         Self::REGULAR_MOVE_SECTION_LENGTH + 2 * Self::SINGLE_RANK_PROMOTION_SECTION_LENGTH;
 
-    pub fn new(probability_iter: impl Iterator<Item = (f32, Move)>) -> Self {
+    pub fn new(probability_iter: impl Iterator<Item = (f32, ChessMove)>) -> Self {
         let mut move_probabilities = Self {
             probabilities: [0.0; Self::ARRAY_LENGTH],
         };
@@ -34,7 +34,7 @@ impl MoveProbabilities {
         move_probabilities
     }
 
-    fn move_to_index(chess_move: Move) -> usize {
+    fn move_to_index(chess_move: ChessMove) -> usize {
         if let Some(piece_kind) = chess_move.promotion {
             let promotion_number: usize = match piece_kind {
                 PieceKind::Queen => 0,
@@ -58,11 +58,11 @@ impl MoveProbabilities {
 
     // This function defines a one-to-one mapping between numbers from 0 to 4609 (non-inclusive) to
     // Chess moves, and back.
-    pub fn get_probability(&self, chess_move: Move) -> f32 {
+    pub fn get_probability(&self, chess_move: ChessMove) -> f32 {
         self.probabilities[Self::move_to_index(chess_move)]
     }
 
-    pub fn set_probability(&mut self, chess_move: Move, probability: f32) {
+    pub fn set_probability(&mut self, chess_move: ChessMove, probability: f32) {
         self.probabilities[Self::move_to_index(chess_move)] = probability;
     }
 }

@@ -5,7 +5,7 @@ use burn::{
         decay::WeightDecayConfig, momentum::MomentumConfig, GradientsParams, Optimizer, SgdConfig,
     },
     tensor::{
-        backend::{ADBackend, Backend},
+        backend::{AutodiffBackend, Backend},
         Shape, Tensor,
     },
 };
@@ -69,7 +69,7 @@ fn loss<B: Backend>(
     loss_per_item.mean()
 }
 
-pub fn run<B: ADBackend>() {
+pub fn run<B: AutodiffBackend>() {
     let epochs = 1000;
     let ply_cap = 80;
     let mut games_per_iteration = 8;
@@ -114,10 +114,10 @@ pub fn run<B: ADBackend>() {
             })
             .unzip();
 
-            let batch = hash_network::stack(batch);
+            let batch = Tensor::stack(batch, 0);
 
             let (expected_values, expected_probabilities) =
-                decouple_output(hash_network::stack(expected_outputs));
+                decouple_output(Tensor::stack(expected_outputs, 0));
             let BatchOutput {
                 values,
                 probabilities,

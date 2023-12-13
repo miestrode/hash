@@ -12,8 +12,8 @@ hash-core = { path = "../hash-core" }
 hash-bootstrap = { path = "../hash-bootstrap" }
 hash-search = { path = "../hash-search" }
 hash-network = { path = "../hash-network" }
-
-burn = { version = "0.9.0", features = ["train", "tch"] }
+burn = { version = "0.11.1", features = ["train"] }
+burn-wgpu = "0.11.1"
 serde = "1.0.188"
 ringbuffer = "0.15.0"
 arrayvec = "0.7.4"

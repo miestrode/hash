@@ -66,7 +66,7 @@ pub fn gen_game<B: Backend>(
         let child_index = rng
             .sample(WeightedIndex::new(children.iter().map(|child| child.tree.visits())).unwrap());
 
-        let child = children.into_vec().into_iter().nth(child_index).unwrap();
+        let child = children.into_iter().nth(child_index).unwrap();
 
         // SAFETY: Children are generated using the standard move generator
         unsafe {

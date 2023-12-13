@@ -1,11 +1,10 @@
 use std::{fmt, fmt::Display, mem, str::FromStr};
 
 use crate::{
-    cache::CacheHash,
     index,
     index::zobrist,
     mg,
-    repr::{ColoredPieceTable, Move, Piece, PieceKind, PieceTable, Player},
+    repr::{ChessMove, ColoredPieceTable, Piece, PieceKind, PieceTable, Player},
 };
 use hash_bootstrap::{BitBoard, Color, Square};
 
@@ -21,12 +20,6 @@ pub struct Board {
     pub min_ply_clock: u8,
     pub full_moves: u16,
     pub hash: u64,
-}
-
-impl CacheHash for Board {
-    fn hash(&self) -> u64 {
-        self.hash
-    }
 }
 
 impl Board {
@@ -124,7 +117,7 @@ impl Board {
     }
 
     // INVARIANT: The passed move must be legal in relation to the current board.
-    pub unsafe fn make_move_unchecked(&mut self, chess_move: &Move) {
+    pub unsafe fn make_move_unchecked(&mut self, chess_move: &ChessMove) {
         self.en_passant_capture_square = None;
         self.checkers = BitBoard::EMPTY;
         self.pinned = BitBoard::EMPTY;
@@ -287,7 +280,7 @@ impl Board {
         }
     }
 
-    pub fn gen_child_boards(&self) -> impl Iterator<Item = (Move, Board)> + '_ {
+    pub fn gen_child_boards(&self) -> impl Iterator<Item = (ChessMove, Board)> + '_ {
         mg::gen_moves(self).into_iter().map(|chess_move| {
             let mut new_board = *self;
             unsafe {
