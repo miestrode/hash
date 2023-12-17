@@ -9,7 +9,7 @@ edition.workspace = true
 [build-dependencies]
 hash-bootstrap = { path = "../hash-bootstrap" }
 
-rustifact = "0.9.0"
+rustifact = "0.10.1"
 rand = "0.8.5"
 
 [dev-dependencies]
@@ -18,6 +18,6 @@ test-case = "3.2.1"
 [dependencies]
 hash-bootstrap = { path = "../hash-bootstrap" }
 
-rustifact = "0.9.0"
+rustifact = "0.10.1"
 arrayvec = "0.7.4"
 

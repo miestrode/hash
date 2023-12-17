@@ -9,4 +9,4 @@ edition.workspace = true
 [dependencies]
 rand = { version = "0.8.5", features = ["min_const_gen"] }
 standard-dist = "1.0.0"
-rustifact = "0.9.0"
+rustifact = "0.10.1"
