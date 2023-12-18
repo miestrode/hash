@@ -236,7 +236,7 @@ impl Gen for Pawn {
             }));
         }
 
-        // En-passants
+        // En passants
         unsafe {
             if let Some(en_passant_capture_square) = board.en_passant_capture_square {
                 for origin in

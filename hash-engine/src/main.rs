@@ -1,7 +1,5 @@
-use std::io;
+use std::error::Error;
 
-use hash_engine::Engine;
-
-fn main() {
-    Engine::new(io::stdin().lock()).run();
+fn main() -> Result<(), Box<dyn Error>> {
+    hash_engine::run()
 }

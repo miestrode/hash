@@ -2,7 +2,11 @@ use std::str::FromStr;
 
 use hash_bootstrap::Color;
 
-use crate::{board::Board, mg, repr::ChessMove};
+use crate::{
+    board::{Board, ParseBoardError},
+    mg,
+    repr::ChessMove,
+};
 
 pub enum Outcome {
     Win(Color),
@@ -45,11 +49,9 @@ impl Game {
 }
 
 impl FromStr for Game {
-    type Err = &'static str;
+    type Err = ParseBoardError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self {
-            board: Board::from_str(s)?,
-        })
+        Board::from_str(s).map(|board| Self { board })
     }
 }

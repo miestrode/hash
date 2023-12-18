@@ -125,18 +125,18 @@ impl Not for Color {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("string must be `w` or `b`")]
+pub struct ParseColorError;
+
 impl FromStr for Color {
-    type Err = &'static str;
+    type Err = ParseColorError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 1 {
-            Err("Input must contain a single character")
-        } else {
-            match s.chars().next().unwrap() {
-                'w' => Ok(Color::White),
-                'b' => Ok(Color::Black),
-                _ => Err("Input must be a 'w' or 'b'"),
-            }
+        match s {
+            "w" => Ok(Self::White),
+            "b" => Ok(Self::Black),
+            _ => Err(ParseColorError),
         }
     }
 }
@@ -242,6 +242,28 @@ impl BitBoard {
         0b00000000
     );
 
+    pub const EDGE_RANKS: Self = bb!(
+        0b11111111
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b11111111
+    );
+
+    pub const EDGES: BitBoard = bb!(
+        0b11111111
+        0b10000001
+        0b10000001
+        0b10000001
+        0b10000001
+        0b10000001
+        0b10000001
+        0b11111111
+    );
+
     // Used to check both if a piece attacks a spot between the king and rook and if the space
     // between them is empty.
     pub const WHITE_KING_SIDE_CASTLE_MASK: Self = bb!(
@@ -287,17 +309,6 @@ impl BitBoard {
     pub const BLACK_QUEEN_SIDE_CASTLE_OCCUPATION_MASK: Self =
         Self::WHITE_QUEEN_SIDE_CASTLE_OCCUPATION_MASK.vertical_flip();
 
-    pub const EDGE_RANKS: Self = bb!(
-        0b11111111
-        0b00000000
-        0b00000000
-        0b00000000
-        0b00000000
-        0b00000000
-        0b00000000
-        0b11111111
-    );
-
     pub const PAWN_START_RANKS: Self = bb!(
         0b00000000
         0b11111111
@@ -306,6 +317,28 @@ impl BitBoard {
         0b00000000
         0b00000000
         0b11111111
+        0b00000000
+    );
+
+    pub const WHITE_EN_PASSANT_CAPTURE_RANKS: Self = bb!(
+        0b00000000
+        0b00000000
+        0b11111111
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+    );
+
+    pub const BLACK_EN_PASSANT_CAPTURE_RANKS: Self = bb!(
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b00000000
+        0b11111111
+        0b00000000
         0b00000000
     );
 

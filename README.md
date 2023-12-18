@@ -7,8 +7,8 @@ A secondary goal of Hash is to use as much Rust as possible in its design, to te
 
 Hash is currently in the process of being written, and has not officially released in any form. It is unlikely the code in the repository here currently works as a full Chess engine.
 
-## CGCF (or, why Hash doesn't support UCI)
-Hash doesn't support UCI, and instead uses its bespoke protocol, CGCF (Chess engine Game Control Format). The reasons for this are explained in [here](docs/CGCF.md). It suffices to say, we felt UCI assumed too many things about the engines implementing it, and that running Hash on a regular GUI was not a sought after goal at this time.
+## CEGO (or, why Hash doesn't support UCI)
+Hash doesn't support UCI, and instead uses its bespoke protocol, CEGO (Chess Engine Game Operation). The reasons for this are partially explained in [here](docs/cego/REVISION-1.md). It suffices to say, we felt UCI and similar protocols weren't good choices given the use cases for this engine.
 
 ### Documentation
 As we feel Hash is a sufficiently large project, documentation explaining things such as its current network structure and things of the like can be seen in [here](docs/). Note that documentation is currently largely incomplete.

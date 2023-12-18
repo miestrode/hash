@@ -512,12 +512,23 @@ impl<T> IndexMut<Square> for [T; 64] {
     }
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
+pub enum ParseSquareError {
+    #[error("square must be two chars")]
+    InvalidLength,
+    #[error("square file must be a letter from `a` to `h`")]
+    InvalidFile,
+    #[error("square rank must be a digit from 1 to 8")]
+    InvalidRank,
+}
+
 impl FromStr for Square {
-    type Err = &'static str;
+    type Err = ParseSquareError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != 2 {
-            Err("Input must contain two characters")
+            Err(ParseSquareError::InvalidLength)
         } else {
             let mut characters = s.chars();
 
@@ -531,7 +542,7 @@ impl FromStr for Square {
                     'f' => 5,
                     'g' => 6,
                     'h' => 7,
-                    _ => return Err("Input's column descriptor must be a character from a to h"),
+                    _ => return Err(ParseSquareError::InvalidFile),
                 } + match characters.next().unwrap() {
                     '1' => 0,
                     '2' => 8,
@@ -541,7 +552,7 @@ impl FromStr for Square {
                     '6' => 40,
                     '7' => 48,
                     '8' => 56,
-                    _ => return Err("Input's row descriptor must be a digit from 1 to 8"),
+                    _ => return Err(ParseSquareError::InvalidRank),
                 },
             ))
         }

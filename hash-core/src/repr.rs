@@ -1,6 +1,7 @@
-use hash_bootstrap::{BitBoard, Color, Square};
+use hash_bootstrap::{BitBoard, Color, ParseSquareError, Square};
 use std::{
     fmt::{self, Display, Write},
+    ops::{Index, IndexMut},
     str::FromStr,
 };
 
@@ -29,23 +30,23 @@ impl Display for PieceKind {
     }
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("piece must be a `k`, `q`, `r`, `b`, `n` or `p`")]
+pub struct ParsePieceKindError;
+
 impl FromStr for PieceKind {
-    type Err = &'static str;
+    type Err = ParsePieceKindError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() == 1 {
-            Ok(match &s[0..1] {
-                "k" => PieceKind::King,
-                "q" => PieceKind::Queen,
-                "r" => PieceKind::Rook,
-                "b" => PieceKind::Bishop,
-                "n" => PieceKind::Knight,
-                "p" => PieceKind::Pawn,
-                _ => return Err("Input must be a valid piece type character (k, q, r, b, n, p)"),
-            })
-        } else {
-            Err("Input must be a single character")
-        }
+        Ok(match s {
+            "k" => PieceKind::King,
+            "q" => PieceKind::Queen,
+            "r" => PieceKind::Rook,
+            "b" => PieceKind::Bishop,
+            "n" => PieceKind::Knight,
+            "p" => PieceKind::Pawn,
+            _ => return Err(ParsePieceKindError),
+        })
     }
 }
 
@@ -125,25 +126,46 @@ impl Piece {
 
 impl Display for Piece {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.color {
-            Color::White => match self.kind {
-                PieceKind::King => 'K',
-                PieceKind::Queen => 'Q',
-                PieceKind::Rook => 'R',
-                PieceKind::Bishop => 'B',
-                PieceKind::Knight => 'N',
-                PieceKind::Pawn => 'P',
-            },
-            Color::Black => match self.kind {
-                PieceKind::King => 'k',
-                PieceKind::Queen => 'q',
-                PieceKind::Rook => 'r',
-                PieceKind::Bishop => 'b',
-                PieceKind::Knight => 'n',
-                PieceKind::Pawn => 'p',
-            },
+        let mut piece_char = match self.kind {
+            PieceKind::King => 'k',
+            PieceKind::Queen => 'q',
+            PieceKind::Rook => 'r',
+            PieceKind::Bishop => 'b',
+            PieceKind::Knight => 'n',
+            PieceKind::Pawn => 'p',
+        };
+
+        if self.color == Color::White {
+            piece_char.make_ascii_uppercase()
         }
-        .fmt(f)
+
+        piece_char.fmt(f)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("piece must be a `k`, `q`, `r`, `b`, `n` or `p`, case-insensitively")]
+pub struct ParsePieceError;
+
+impl TryFrom<char> for Piece {
+    type Error = ParsePieceError;
+
+    fn try_from(c: char) -> Result<Self, Self::Error> {
+        Ok(match c {
+            'k' => Piece::BLACK_KING,
+            'q' => Piece::BLACK_QUEEN,
+            'r' => Piece::BLACK_ROOK,
+            'b' => Piece::BLACK_BISHOP,
+            'n' => Piece::BLACK_KNIGHT,
+            'p' => Piece::BLACK_PAWN,
+            'K' => Piece::WHITE_KING,
+            'Q' => Piece::WHITE_QUEEN,
+            'R' => Piece::WHITE_ROOK,
+            'B' => Piece::WHITE_BISHOP,
+            'N' => Piece::WHITE_KNIGHT,
+            'P' => Piece::WHITE_PAWN,
+            _ => return Err(ParsePieceError),
+        })
     }
 }
 
@@ -168,20 +190,35 @@ impl Display for ChessMove {
     }
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
+pub enum ParseChessMoveError {
+    #[error("move must be 4 or 5 chars")]
+    InvalidLength,
+    #[error("invalid origin square")]
+    InvalidOriginSquare(#[source] ParseSquareError),
+    #[error("invalid target square")]
+    InvalidTargetSquare(#[source] ParseSquareError),
+    #[error("invalid promotion piece")]
+    InvalidPromotionPiece(#[source] ParsePieceKindError),
+}
+
 impl FromStr for ChessMove {
-    type Err = &'static str;
+    type Err = ParseChessMoveError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() < 4 {
-            Err("Input too short")
-        } else if s.len() > 5 {
-            Err("Input too long")
+        if !(4..5).contains(&s.len()) {
+            Err(ParseChessMoveError::InvalidLength)
         } else {
-            let origin = Square::from_str(&s[0..2])?;
-            let target = Square::from_str(&s[2..4])?;
-
+            let origin =
+                Square::from_str(&s[0..2]).map_err(ParseChessMoveError::InvalidOriginSquare)?;
+            let target =
+                Square::from_str(&s[2..4]).map_err(ParseChessMoveError::InvalidTargetSquare)?;
             let promotion = if s.len() == 5 {
-                Some(PieceKind::from_str(&s[4..5])?)
+                Some(
+                    PieceKind::from_str(&s[4..5])
+                        .map_err(ParseChessMoveError::InvalidPromotionPiece)?,
+                )
             } else {
                 None
             };
@@ -196,7 +233,7 @@ impl FromStr for ChessMove {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct CastlingRights(pub [bool; 64]);
+pub struct CastlingRights([bool; 64]);
 
 impl CastlingRights {
     pub fn empty() -> Self {
@@ -217,9 +254,19 @@ impl CastlingRights {
             | ((self.0[Square::A8] as usize) << 2)
             | ((self.0[Square::H8] as usize) << 3)
     }
+}
 
-    pub fn revoke(&mut self, square: Square) {
-        self.0[square] = false;
+impl Index<Square> for CastlingRights {
+    type Output = bool;
+
+    fn index(&self, index: Square) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<Square> for CastlingRights {
+    fn index_mut(&mut self, index: Square) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }
 
@@ -279,9 +326,9 @@ impl Player {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct PieceTable([Option<PieceKind>; 64]);
+pub struct PieceKindBoard([Option<PieceKind>; 64]);
 
-impl PieceTable {
+impl PieceKindBoard {
     pub fn piece_kind(&self, square: Square) -> Option<PieceKind> {
         self.0[square]
     }
@@ -292,17 +339,17 @@ impl PieceTable {
 }
 
 #[derive(Clone, Copy)]
-pub struct ColoredPieceTable([Option<Piece>; 64]);
+pub struct PieceBoard([Option<Piece>; 64]);
 
-impl ColoredPieceTable {
+impl PieceBoard {
     pub const EMPTY: Self = Self([None; 64]);
 
     pub fn pieces(&self) -> &[Option<Piece>; 64] {
         &self.0
     }
 
-    pub fn uncolored(&self) -> PieceTable {
-        PieceTable(
+    pub fn uncolored(&self) -> PieceKindBoard {
+        PieceKindBoard(
             self.0
                 .into_iter()
                 .map(|square| square.map(|piece| piece.kind))
@@ -313,16 +360,27 @@ impl ColoredPieceTable {
     }
 }
 
-impl FromStr for ColoredPieceTable {
-    type Err = &'static str;
+#[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
+pub enum ParsePieceBoardError {
+    #[error("board must have 8 rows")]
+    InvalidRowLength,
+    #[error("char in row must be a piece, or a digit from 1 to 8")]
+    InvalidRowChar,
+    #[error("spacing in row is invalid")]
+    ColumnOffsetOverflow,
+}
+
+impl FromStr for PieceBoard {
+    type Err = ParsePieceBoardError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut board_pieces = ColoredPieceTable::EMPTY;
+        let mut board_pieces = PieceBoard::EMPTY;
 
         let rows = s.split('/').collect::<Vec<_>>();
 
         if rows.len() != 8 {
-            Err("Input contains the wrong amount of rows")
+            Err(ParsePieceBoardError::InvalidRowLength)
         } else {
             let mut row_offset = 64;
 
@@ -342,31 +400,15 @@ impl FromStr for ColoredPieceTable {
                         '8' => column_offset += 8,
                         _ => {
                             column_offset += 1;
-                            board_pieces.0[(row_offset + column_offset) as usize] =
-                                Some(match character {
-                                    'K' => Piece::WHITE_KING,
-                                    'Q' => Piece::WHITE_QUEEN,
-                                    'R' => Piece::WHITE_ROOK,
-                                    'B' => Piece::WHITE_BISHOP,
-                                    'N' => Piece::WHITE_KNIGHT,
-                                    'P' => Piece::WHITE_PAWN,
-                                    'k' => Piece::BLACK_KING,
-                                    'q' => Piece::BLACK_QUEEN,
-                                    'r' => Piece::BLACK_ROOK,
-                                    'b' => Piece::BLACK_BISHOP,
-                                    'n' => Piece::BLACK_KNIGHT,
-                                    'p' => Piece::BLACK_PAWN,
-                                    _ => return Err(
-                                        "Input contains an invalid character in one of the rows",
-                                    ),
-                                });
+                            board_pieces.0[(row_offset + column_offset) as usize] = Some(
+                                Piece::try_from(character)
+                                    .map_err(|_| ParsePieceBoardError::InvalidRowChar)?,
+                            );
                         }
                     }
 
                     if column_offset > 7 {
-                        return Err(
-                            "Input contains an overflowed row (The column offset is too high)",
-                        );
+                        return Err(ParsePieceBoardError::ColumnOffsetOverflow);
                     }
                 }
             }

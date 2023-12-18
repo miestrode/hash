@@ -17,7 +17,7 @@ mod tests {
     use test_case::test_case;
 
     #[bench]
-    fn bench_perft_default_1(b: &mut Bencher) {
+    fn bench_perft_starting_position_depth_5(b: &mut Bencher) {
         let board = Board::starting_position();
 
         b.iter(|| board.perft(5));

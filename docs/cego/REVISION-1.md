@@ -75,17 +75,10 @@ where `<PLAYED-MOVE>` is the move the opponent made. Notice the increments are n
 ### By the mediator
 The mediator may stop the game at any time, at which point, they should terminate the two engine processes. No notice needs to be given to the engines. Despite this, the mediator *must* stop the game if it has reached a "definite conclusion". This means either stalemate, checkmate, or a draw by FIDE rules. When a game is terminated due to a FIDE draw, the mediator must make sure the playing engine could not deliver mate in their turn.
 
-Additionally, the mediator must stop the game if at least one of the engine processes somehow stop.
+Additionally, the mediator must stop the game if at least one of the engine processes quit. This quitting should be assumed to be due to an error.
 
 ### By an engine
 When the game is terminated by an engine, unlike the mediator, it must be for a specific reason, and therefore, with a specific message to the mediator.
-
-#### Encountering a protocol error
-When an engine encounters an error with the last message sent by the mediator, it will send the message:
-```
-error\n
-```
-once this message is sent, the engine may quit, and the game should be terminated by the mediator.
 
 #### Forfeiting the game
 When the engine sees fit, instead of sending the expected message, it may send the message:

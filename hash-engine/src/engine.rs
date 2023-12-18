@@ -1,164 +1,230 @@
 use std::{
-    io::{BufRead, StdinLock},
+    self,
+    borrow::BorrowMut,
+    error::Error,
+    io::{BufRead, Lines, StdinLock},
+    iter,
+    num::ParseIntError,
     str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     thread,
     time::Duration,
 };
 
-use hash_core::{board::Board, repr::ChessMove};
-use hash_search::tree::{Child, Tree};
+use hash_core::{
+    board::{Board, ParseBoardError},
+    repr::{ChessMove, ParseChessMoveError},
+};
+use hash_search::{
+    search::{SearchCommand, SearchThread},
+    tree::Tree,
+};
 
-const UPDATE_CAPACITY: usize = 60;
-
-struct Timings {
+struct TimeData {
     time_left: Duration,
-    increment: Duration,
     opponent_time_left: Duration,
+}
+
+struct IncrementData {
+    increment: Duration,
     opponent_increment: Duration,
 }
 
-impl FromStr for Timings {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts = s
-            .split(' ')
-            .map(|time| time.parse::<u64>().map(Duration::from_nanos))
-            .try_collect::<Vec<_>>()
-            .map_err(|_| "Could not parse time integer")?;
-
-        if parts.len() != 4 {
-            Err("Timing information must consist of 4 space-separated parts")
-        } else {
-            Ok(Self {
-                time_left: parts[0],
-                increment: parts[1],
-                opponent_time_left: parts[2],
-                opponent_increment: parts[3],
-            })
-        }
-    }
-}
-
-struct InitialUpdate {
-    timings: Timings,
+struct InitialMessage {
+    times: TimeData,
+    increments: IncrementData,
     board: Board,
 }
 
-struct RegularUpdate {
-    time_left: Duration,
-    opponent_time_left: Duration,
+#[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
+pub enum ParseInitialMessageError {
+    #[error("initial message have 5 parts")]
+    InvalidPartAmount,
+    #[error("time must be an unsigned 64-bit integer")]
+    InvalidTime(#[source] ParseIntError),
+    #[error("position must be valid fen")]
+    InvalidBoard(#[source] ParseBoardError),
+}
+
+// FIXME: This should collect to a vector and use a length check, anything else is invalid
+impl FromStr for InitialMessage {
+    type Err = ParseInitialMessageError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.splitn(5, ' ');
+
+        let mut times = parts
+            .borrow_mut()
+            .take(4)
+            .map(|time| {
+                time.parse::<u64>()
+                    .map(Duration::from_nanos)
+                    .map_err(ParseInitialMessageError::InvalidTime)
+            })
+            .chain(iter::repeat(Err(
+                ParseInitialMessageError::InvalidPartAmount,
+            )));
+
+        Ok(Self {
+            times: TimeData {
+                time_left: times.next().unwrap()?,
+                opponent_time_left: times.next().unwrap()?,
+            },
+            increments: IncrementData {
+                increment: times.next().unwrap()?,
+                opponent_increment: times.next().unwrap()?,
+            },
+            board: Board::from_str(
+                parts
+                    .next()
+                    .ok_or(ParseInitialMessageError::InvalidPartAmount)?,
+            )
+            .map_err(ParseInitialMessageError::InvalidBoard)?,
+        })
+    }
+}
+
+struct SubsequentMessage {
+    times: TimeData,
     played_move: ChessMove,
 }
 
-enum Update {
-    Initial(InitialUpdate),
-    Regular(RegularUpdate),
+#[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
+pub enum ParseSubsequentMessageError {
+    #[error("subsequent messsage must have 3 parts")]
+    InvalidPartAmount,
+    #[error("time must be an unsigned 64-bit integer")]
+    InvalidTime(#[source] ParseIntError),
+    #[error("move must be in uci notation")]
+    InvalidMove(#[source] ParseChessMoveError),
+}
+
+impl FromStr for SubsequentMessage {
+    type Err = ParseSubsequentMessageError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split(' ').map(Ok).chain(iter::repeat(Err(
+            ParseSubsequentMessageError::InvalidPartAmount,
+        )));
+
+        Ok(Self {
+            times: TimeData {
+                time_left: Duration::from_nanos(
+                    parts
+                        .next()
+                        .unwrap()?
+                        .parse::<u64>()
+                        .map_err(ParseSubsequentMessageError::InvalidTime)?,
+                ),
+                opponent_time_left: Duration::from_nanos(
+                    parts
+                        .next()
+                        .unwrap()?
+                        .parse::<u64>()
+                        .map_err(ParseSubsequentMessageError::InvalidTime)?,
+                ),
+            },
+            played_move: ChessMove::from_str(parts.next().unwrap()?)
+                .map_err(ParseSubsequentMessageError::InvalidMove)?,
+        })
+    }
+}
+
+pub struct MessageReader<'a>(Lines<StdinLock<'a>>);
+
+impl<'a> MessageReader<'a> {
+    pub fn new(stdin_lock: StdinLock<'a>) -> Self {
+        Self(stdin_lock.lines())
+    }
+
+    fn read_initial_message(&mut self) -> Result<InitialMessage, Box<dyn Error>> {
+        Ok(
+            InitialMessage::from_str(&self.0.next().ok_or(ProtocolError::InputStreamClosed)??)
+                .map_err(ProtocolError::InvalidInitialMessage)?,
+        )
+    }
+
+    fn read_subsequent_message(&mut self) -> Result<SubsequentMessage, Box<dyn Error>> {
+        Ok(
+            SubsequentMessage::from_str(&self.0.next().ok_or(ProtocolError::InputStreamClosed)??)
+                .map_err(ProtocolError::InvalidSubsequentMessage)?,
+        )
+    }
 }
 
 pub struct Engine<'a> {
-    tree: Tree,
-    stdin_handle: StdinLock<'a>,
-    timings: Timings,
+    command_sender: Sender<SearchCommand>,
+    best_move_receiver: Receiver<ChessMove>,
+    times: TimeData,
+    increments: IncrementData,
+    message_reader: MessageReader<'a>,
+    search_thread: SearchThread,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ProtocolError {
+    #[error("invalid initial message")]
+    InvalidInitialMessage(#[source] ParseInitialMessageError),
+    #[error("invalid subsequent message")]
+    InvalidSubsequentMessage(#[source] ParseSubsequentMessageError),
+    #[error("input stream closed")]
+    InputStreamClosed,
 }
 
 impl<'a> Engine<'a> {
-    pub fn new(mut stdin_handle: StdinLock<'a>) -> Self {
-        let mut update = String::with_capacity(UPDATE_CAPACITY);
-        stdin_handle
-            .read_line(&mut update)
-            .expect("Failed to read update");
-        update.pop(); // Remove trailing newline
-        let update_parts = update.split(' ').collect::<Vec<_>>();
+    pub fn new(mut message_reader: MessageReader<'a>) -> Result<Self, Box<dyn Error>> {
+        let (command_sender, command_receiver) = mpsc::channel();
+        let (best_move_sender, best_move_receiver) = mpsc::channel();
 
-        Self {
-            tree: Tree::new(
-                Board::from_str(&update_parts[4..].join(" ")).expect("Update FEN is invalid"),
-            ),
-            stdin_handle,
-            time_left: Duration::from_nanos(update_parts[0].parse::<u64>().unwrap()),
-            increment: Duration::from_nanos(update_parts[1].parse::<u64>().unwrap()),
-            opponent_time_left: Duration::from_nanos(update_parts[2].parse::<u64>().unwrap()),
-            opponent_increment: Duration::from_nanos(update_parts[3].parse::<u64>().unwrap()),
-        }
+        let InitialMessage {
+            times,
+            increments,
+            board,
+        } = message_reader.read_initial_message()?;
+
+        Ok(Self {
+            search_thread: SearchThread::new(Tree::new(board), command_receiver, best_move_sender),
+            command_sender,
+            best_move_receiver,
+            times,
+            increments,
+            message_reader,
+        })
     }
 
-    fn start_search(tree: Tree) -> impl FnOnce() -> thread::Result<Tree> {
-        let stop_search = Arc::new(AtomicBool::new(false));
-
-        let stop_search_clone = stop_search.clone();
-        let join_handle = thread::spawn(move || hash_search::search(tree, stop_search_clone));
-
-        move || {
-            stop_search.store(true, Ordering::Relaxed);
-            join_handle.join()
-        }
+    fn calculate_thinking_time(&self) -> Duration {
+        Duration::from_secs(5)
     }
 
-    fn search(mut self, time: Duration) -> Self {
-        let stop_search = Self::start_search(self.tree);
+    fn think(&mut self) -> Result<(), Box<dyn Error>> {
+        thread::sleep(self.calculate_thinking_time());
 
-        // It's fine to block command handling because the SCCS spec doesn't allow for commands to
-        // arrive while making a move
-        thread::sleep(time);
+        self.command_sender
+            .send(SearchCommand::SendAndPlayBestMove)?;
 
-        self.tree = stop_search().expect("Could not join search thread");
+        println!("{}", self.best_move_receiver.recv()?);
 
-        self
+        Ok(())
     }
 
-    fn advance_tree(mut self, advancing_move: ChessMove) -> Self {
-        self.tree = self
-            .tree
-            .children()
-            .unwrap()
-            .into_iter()
-            .find(|Child { chess_move, .. }| *chess_move == advancing_move)
-            .unwrap()
-            .tree;
-        self
+    fn ponder(&mut self) -> Result<(), Box<dyn Error>> {
+        let SubsequentMessage { times, played_move } =
+            self.message_reader.read_subsequent_message()?;
+
+        self.times = times;
+        self.command_sender
+            .send(SearchCommand::PlayedMove(played_move))?;
+
+        Ok(())
     }
 
-    // When pondering, instead of having a fixed time-frame, we want to naturally stop as soon as
-    // the opponent has made their move. This means that while the search thread runs, we must
-    // check for updates as to wether the opponent made their move
-    fn ponder(mut self) -> Self {
-        let stop_search = Self::start_search(self.tree);
-
-        let mut update = String::with_capacity(UPDATE_CAPACITY);
-        self.stdin_handle
-            .read_line(&mut update)
-            .expect("Failed to read update");
-        update.pop(); // Remove trailing newline
-        let update_parts = update.split(' ').collect::<Vec<_>>();
-
-        self.time_left = Duration::from_nanos(update_parts[0].parse::<u64>().unwrap());
-        self.opponent_time_left = Duration::from_nanos(update_parts[1].parse::<u64>().unwrap());
-
-        let played_move =
-            ChessMove::from_str(update_parts[2]).expect("Received update move is invalid");
-
-        self.tree = stop_search().expect("Couldn't join searching thread");
-        self = self.advance_tree(played_move);
-
-        self
-    }
-
-    fn send_move(self) -> Self {
-        let best_move = self.tree.best_move();
-        println!("{}", best_move);
-        self.advance_tree(best_move)
-    }
-
-    pub fn run(mut self) {
+    pub fn run(mut self) -> Result<(), Box<dyn Error>> {
         loop {
-            self = self.search(Duration::from_secs(5));
-            self = self.send_move();
-            self = self.ponder();
+            self.think()?;
+            self.ponder()?;
         }
     }
 }

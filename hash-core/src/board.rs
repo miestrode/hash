@@ -1,12 +1,18 @@
-use std::{fmt, fmt::Display, mem, str::FromStr};
+use std::{
+    fmt,
+    fmt::Display,
+    mem,
+    num::{IntErrorKind, ParseIntError},
+    str::FromStr,
+};
 
 use crate::{
     index,
     index::zobrist,
     mg,
-    repr::{ChessMove, ColoredPieceTable, Piece, PieceKind, PieceTable, Player},
+    repr::{ChessMove, ParsePieceBoardError, Piece, PieceBoard, PieceKind, PieceKindBoard, Player},
 };
-use hash_bootstrap::{BitBoard, Color, Square};
+use hash_bootstrap::{BitBoard, Color, ParseSquareError, Square};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Board {
@@ -16,7 +22,7 @@ pub struct Board {
     pub pinned: BitBoard,
     pub playing_color: Color,
     pub en_passant_capture_square: Option<Square>,
-    pub piece_table: PieceTable,
+    pub piece_table: PieceKindBoard,
     pub min_ply_clock: u8,
     pub full_moves: u16,
     pub hash: u64,
@@ -24,7 +30,6 @@ pub struct Board {
 
 impl Board {
     pub fn starting_position() -> Self {
-        // Taken from https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
         Self::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
     }
 
@@ -98,7 +103,7 @@ impl Board {
         self.checkers ^= index::knight_attacks(king_square) & self.them.knights;
         self.checkers ^= index::pawn_attacks(king_square, self.playing_color) & self.them.pawns;
 
-        // Get all the sliding pieces that could be attacking the enemy king
+        // Get all the sliding pieces that could be attacking the king
         let attackers = (index::rook_slides(king_square, self.them.occupation)
             & (self.them.rooks + self.them.queens))
             + (index::bishop_slides(king_square, self.them.occupation)
@@ -129,8 +134,8 @@ impl Board {
 
         let mut is_capture = false;
 
-        self.us.castling_rights.revoke(chess_move.origin);
-        self.them.castling_rights.revoke(chess_move.target);
+        self.us.castling_rights[chess_move.origin] = false;
+        self.them.castling_rights[chess_move.target] = false;
 
         // SAFETY: Move is assumed to be legal.
         unsafe {
@@ -162,7 +167,7 @@ impl Board {
                             .move_one_down_unchecked(self.playing_color),
                     )
                 } else if chess_move.origin.file() != chess_move.target.file() {
-                    // If we are here, this must mean the move was an en-passant.
+                    // If we are here, this must mean the move was an en passant.
                     self.remove_piece_unchecked(
                         chess_move
                             .target
@@ -292,77 +297,106 @@ impl Board {
     }
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+#[non_exhaustive]
+pub enum ParseBoardError {
+    #[error("fen should contain 6 space-separated parts")]
+    InvalidPartAmount,
+    #[error("board setup is malformed")]
+    MalformedArrangement(#[source] ParsePieceBoardError),
+    #[error("color must be `w` or `b`")]
+    InvalidColor,
+    #[error("invalid en passant square")]
+    InvalidEnPassantSquare(#[source] Option<ParseSquareError>),
+    #[error("castling rights should only contain `K`, `Q`, `k`, and `q`, and at most once")]
+    InvalidCastlingRights,
+    #[error("half-move clock should be a non-negative integer")]
+    InvalidHalfMoveClock(#[source] ParseIntError),
+    #[error("full-move number should be a non-negative integer, not smaller than the half-move clock over 2, floored")]
+    InvalidFullMoveNumber(#[source] Option<ParseIntError>),
+    #[error("provided board allows for the capture of a king")]
+    CapturableKing,
+    #[error("provided board has pawns on edge ranks")]
+    PawnsOnEdgeRanks,
+    #[error("provided board must have one king for each side")]
+    InvalidKingCount,
+}
+
+// TODO: Check that the board is logical, meaning we have two kings, no pawns are on the edge
+// ranks, the en passant square is possible, and the playing side cannot capture the opponent's king.
 impl FromStr for Board {
-    type Err = &'static str;
+    type Err = ParseBoardError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts = s.split(' ').collect::<Vec<_>>();
 
         if parts.len() != 6 {
-            Err("Input must contain 6 parts separated by spaces")
+            Err(ParseBoardError::InvalidPartAmount)
         } else {
-            let colored_piece_table = ColoredPieceTable::from_str(parts[0])?;
-            let current_color = Color::from_str(parts[1])?;
+            let piece_board =
+                PieceBoard::from_str(parts[0]).map_err(ParseBoardError::MalformedArrangement)?;
+            let current_color =
+                Color::from_str(parts[1]).map_err(|_| ParseBoardError::InvalidColor)?;
 
             let en_passant_capture_square = match parts[3] {
                 "-" => None,
-                square => Some(Square::from_str(square)?),
+                square => Some(
+                    Square::from_str(square)
+                        .map_err(|error| ParseBoardError::InvalidEnPassantSquare(Some(error)))?,
+                ),
             };
 
-            let ply_clock = parts[4]
-                .parse::<u8>()
-                .map_err(|_| "Input contains invalid number for the half-move clock")?;
+            let ply_clock = match parts[4].parse::<u8>() {
+                Ok(ply_clock) => ply_clock,
+                Err(error) if *error.kind() == IntErrorKind::PosOverflow => u8::MAX,
+                Err(error) => return Err(ParseBoardError::InvalidHalfMoveClock(error)),
+            };
 
-            let full_moves = parts[5]
-                .parse::<u16>()
-                .map_err(|_| "Input contains invalid number for full-moves")?;
+            let full_moves = match parts[5].parse::<u16>() {
+                Ok(full_moves) if full_moves >= ply_clock as u16 / 2 => full_moves,
+                Ok(_) => return Err(ParseBoardError::InvalidFullMoveNumber(None)),
+                Err(error) if *error.kind() == IntErrorKind::PosOverflow => u16::MAX,
+                Err(error) => return Err(ParseBoardError::InvalidFullMoveNumber(Some(error))),
+            };
 
             let mut white = Player::blank();
             let mut black = Player::blank();
 
-            for (piece, square) in colored_piece_table
-                .pieces()
-                .iter()
-                .copied()
-                .zip(Square::ALL)
-            {
-                if let Some(Piece {
-                    kind,
-                    color: Color::White,
-                }) = piece
-                {
-                    white.toggle_piece(square, kind);
-                } else if let Some(Piece {
-                    kind,
-                    color: Color::Black,
-                }) = piece
-                {
-                    black.toggle_piece(square, kind);
+            for (piece, square) in piece_board.pieces().iter().copied().zip(Square::ALL) {
+                if let Some(Piece { kind, color }) = piece {
+                    match color {
+                        Color::White => &mut white,
+                        Color::Black => &mut black,
+                    }
+                    .toggle_piece(square, kind);
                 }
             }
 
-            if white.king.is_empty() || black.king.is_empty() {
-                return Err("Input is illegal as a FEN-string must include both players' kings");
-            }
+            // When creating a board from FEN, the rook squares encode castling, and since
+            // CastlingRights uses the conjunction of the king and rook squares, they are assigned
+            // `true` here.
+            white.castling_rights[Square::E1] = true;
+            black.castling_rights[Square::E8] = true;
 
             if parts[2] != "-" {
-                white.castling_rights.0[Square::H1] = parts[2].contains('K');
-                white.castling_rights.0[Square::A1] = parts[2].contains('Q');
-                black.castling_rights.0[Square::H8] = parts[2].contains('k');
-                black.castling_rights.0[Square::A8] = parts[2].contains('q');
-                // This would indicate the part contains some characters other than K, Q, k or q.
-                if ((white.castling_rights.0[Square::H1] as usize)
-                    + (white.castling_rights.0[Square::A1] as usize)
-                    + (black.castling_rights.0[Square::H8] as usize)
-                    + (black.castling_rights.0[Square::A8] as usize))
-                    != parts[2].len()
-                {
-                    return Err("Input contains invalid data for castling information");
+                white.castling_rights[Square::H1] = parts[2].contains('K');
+                white.castling_rights[Square::A1] = parts[2].contains('Q');
+                black.castling_rights[Square::H8] = parts[2].contains('k');
+                black.castling_rights[Square::A8] = parts[2].contains('q');
+
+                // Assuming each match was singular and the part has no invalid characters,
+                // this would be the length of the part.
+                let assumed_length = (white.castling_rights[Square::H1] as usize)
+                    + (white.castling_rights[Square::A1] as usize)
+                    + (black.castling_rights[Square::H8] as usize)
+                    + (black.castling_rights[Square::A8] as usize);
+
+                // If the assumed length is not the actual one, the part has some invalid
+                // characters, or repetitions
+                if parts[2].is_empty() || assumed_length != parts[2].len() {
+                    return Err(ParseBoardError::InvalidCastlingRights);
                 }
             }
-
-            white.castling_rights.0[Square::E1] = true;
-            black.castling_rights.0[Square::E8] = true;
 
             let (current_player, opposing_player) = match current_color {
                 Color::White => (white, black),
@@ -373,9 +407,9 @@ impl FromStr for Board {
                 us: current_player,
                 them: opposing_player,
                 playing_color: current_color,
-                piece_table: colored_piece_table.uncolored(),
+                piece_table: piece_board.uncolored(),
                 en_passant_capture_square,
-                hash: zobrist::piece_table(&colored_piece_table)
+                hash: zobrist::piece_table(&piece_board)
                     ^ zobrist::side(current_color)
                     ^ en_passant_capture_square
                         .map_or(0, |square| zobrist::en_passant_file(square.file()))
@@ -389,7 +423,59 @@ impl FromStr for Board {
 
             board.update_move_restrictions();
 
-            Ok(board)
+            let is_impossible_en_passant_square = en_passant_capture_square.is_some_and(|square| {
+                let is_impossible_capture_square = (BitBoard::from(square)
+                    & match current_color {
+                        Color::White => BitBoard::WHITE_EN_PASSANT_CAPTURE_RANKS,
+                        Color::Black => BitBoard::BLACK_EN_PASSANT_CAPTURE_RANKS,
+                    })
+                .is_empty();
+
+                let with_mismatching_pawn = piece_board.pieces()
+                    [unsafe { square.move_one_down_unchecked(current_color) }]
+                    != Some(Piece {
+                        kind: PieceKind::Pawn,
+                        color: !current_color,
+                    });
+
+                is_impossible_capture_square || with_mismatching_pawn
+            });
+
+            let mut enemy_king_checkers = BitBoard::EMPTY;
+
+            let king_square = unsafe { Square::try_from(board.them.king).unwrap_unchecked() };
+
+            enemy_king_checkers ^= index::knight_attacks(king_square) & board.us.knights;
+            enemy_king_checkers ^=
+                index::pawn_attacks(king_square, !current_color) & board.us.pawns;
+
+            // Get all the sliding pieces that could be attacking the enemy king
+            let attackers = (index::rook_slides(king_square, board.us.occupation)
+                & (board.us.rooks + board.us.queens))
+                + (index::bishop_slides(king_square, board.us.occupation)
+                    & (board.us.bishops + board.us.queens));
+
+            // Update pins
+            for attacker in attackers.bits() {
+                let pieces_between =
+                    index::line_between(attacker, king_square) & board.them.occupation;
+
+                if pieces_between.is_empty() {
+                    enemy_king_checkers ^= attacker.into();
+                }
+            }
+
+            if !board.us.king.is_a_single_one() || !board.them.king.is_a_single_one() {
+                Err(ParseBoardError::InvalidKingCount)
+            } else if !(board.us.pawns & BitBoard::EDGE_RANKS).is_empty() {
+                Err(ParseBoardError::PawnsOnEdgeRanks)
+            } else if is_impossible_en_passant_square {
+                Err(ParseBoardError::InvalidEnPassantSquare(None))
+            } else if !enemy_king_checkers.is_empty() {
+                Err(ParseBoardError::CapturableKing)
+            } else {
+                Ok(board)
+            }
         }
     }
 }

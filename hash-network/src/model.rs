@@ -15,7 +15,7 @@ use std::iter;
 pub const SINGLE_BOARD_DIMENSION: usize =
     6 // 6 piece kinds for white 
         + 6 // 6 piece kinds for black 
-        + 1 // 1 layer for the en-passant square
+        + 1 // 1 layer for the en passant square
         + 2 // 2 ways to castle (king-side, queen-side) for white
         + 2 // 2 ways to castle (king-side, queen-side) for black
         + 1 // 1 layer to denote who is playing. 1 = white, -1 = black.

@@ -2,12 +2,33 @@
 codegen-units = 1
 lto = true
 
+[profile.test]
+inherits = "release"
+
 [profile.bench]
 inherits = "release"
 
 [workspace]
-members = ["hash-bootstrap", "hash-core", "hash-train", "hash-search", "hash-engine", "hash-network"]
-resolver = "2"
+members = [
+    "hash-bootstrap",
+    "hash-core",
+    "hash-train",
+    "hash-search",
+    "hash-engine",
+    "hash-network",
+]
+
+[workspace.dependencies]
+rustifact = "0.10.1"
+burn = "0.11.1"
+burn-wgpu = "0.11.1"
+serde = "1.0.193"
+num-traits = "0.2.17"
+thiserror = "1.0.51"
+rand = "0.8.5"
+standard-dist = "1.0.0"
+arrayvec = "0.7.4"
+test-case = "3.3.1"
 
 [workspace.package]
 version = "0.1.0"

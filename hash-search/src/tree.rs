@@ -39,6 +39,20 @@ impl Tree {
         }
     }
 
+    pub fn advance(self, chess_move: ChessMove) -> Option<Tree> {
+        self.children()
+            .unwrap()
+            .into_iter()
+            .find(
+                |Child {
+                     chess_move: child_move,
+                     ..
+                 }| *child_move == chess_move,
+            )
+            .map(|child| child.tree)
+    }
+
+    // TODO: Make this code fault tolerant
     pub fn best_move(&self) -> ChessMove {
         self.children_ref()
             .unwrap()

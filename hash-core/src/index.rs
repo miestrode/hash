@@ -1,23 +1,13 @@
-#[cfg(target_feature = "bmi2")]
-use std::arch::x86_64;
-
 use hash_bootstrap::{
-    BitBoard, Color, Square, ZobristCastlingRights, ZobristMap, ZobristPieces, ZobristSide,
+    BitBoard, Color, Metadata, Square, ZobristCastlingRights, ZobristMap, ZobristPieces,
+    ZobristSide,
 };
 
-#[derive(Clone, Copy)]
-struct Metadata {
-    offset: usize,
-    mask: BitBoard,
-    #[cfg(not(target_feature = "bmi2"))]
-    pub magic: u64,
-}
-
 rustifact::use_symbols!(
-    CROSS_SLIDES,
-    CROSS_META,
-    DIAGONAL_SLIDES,
-    DIAGONAL_META,
+    ROOK_SLIDES,
+    ROOK_SLIDE_METADATA,
+    BISHOP_SLIDES,
+    BISHOP_SLIDE_METADATA,
     KNIGHT_ATTACKS,
     KING_ATTACKS,
     LINE,
@@ -29,7 +19,6 @@ rustifact::use_symbols!(
     ZOBRIST_MAP
 );
 
-#[cfg(target_feature = "bmi2")]
 /// Returns the bitboard of every square a rook can reach when on the passed `origin` square.
 /// The `blockers` bitboard allows one to restrict the rooks movement, as a rook cannot jump over
 /// a "blocker" (although it can eat it).
@@ -66,62 +55,11 @@ rustifact::use_symbols!(
 /// the squares of the blockers reachable by the rook. Likewise note how the blockers on the edges
 /// of the board didn't make any difference to the output.
 pub fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
-    let metadata = CROSS_META[origin];
+    let metadata = ROOK_SLIDE_METADATA[origin];
 
-    *unsafe {
-        CROSS_SLIDES.get_unchecked(
-            metadata.offset + x86_64::_pext_u64(blockers.0, metadata.mask.0) as usize,
-        )
-    }
+    ROOK_SLIDES[metadata.create_global_index(blockers)]
 }
 
-#[cfg(not(target_feature = "bmi2"))]
-/// Returns the bitboard of every square a rook can reach when on the passed `origin` square.
-/// The `blockers` bitboard allows one to restrict the rooks movement, as a rook cannot jump over
-/// a "blocker" (although it can eat it).
-///
-/// This function may be implemented using PEXT on systems supporting this feature and will
-/// otherwise use magic bitboards.
-///
-/// # Example
-/// Given a rook on D4, and a set of blockers:
-/// ```text
-/// . 1 . . . . . .
-/// . . . . 1 . . .
-/// . . . 1 . . . .
-/// . . . . . . . .
-/// . . . X . . 1 .
-/// . . . . . . . .
-/// 1 . . . . 1 . .
-/// . . . 1 . . . .
-/// ```
-///
-/// The result would be:
-/// ```text
-/// . . . . . . . .
-/// . . . . . . . .
-/// . . . 1 . . . .
-/// . . . 1 . . . .
-/// 1 1 1 X 1 1 1 .
-/// . . . 1 . . . .
-/// . . . 1 . . . .
-/// . . . 1 . . . .
-/// ```
-///
-/// Where the square marked with an `X` is where our rook is. Notice how the final output includes
-/// the squares of the blockers reachable by the rook. Likewise note how the blockers on the edges
-/// of the board didn't make any difference to the output.
-pub fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
-    let metadata = CROSS_META[origin];
-    unsafe {
-        *SLIDES.get_unchecked(
-            metadata.offset
-                + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 12)) as usize,
-        )
-    }
-}
-
-#[cfg(target_feature = "bmi2")]
 /// Returns the bitboard of every square a rook can reach when on the passed `origin` square.
 /// The `blockers` bitboard allows one to restrict the rook's movement, as a bishop cannot jump over
 /// a "blocker" (although it can eat it).
@@ -158,59 +96,9 @@ pub fn rook_slides(origin: Square, blockers: BitBoard) -> BitBoard {
 /// the squares of the blockers reachable by the bishop. Likewise note how the blockers on the edges
 /// of the board didn't make any difference to the output.
 pub fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
-    let metadata = DIAGONAL_META[origin];
+    let metadata = BISHOP_SLIDE_METADATA[origin];
 
-    *unsafe {
-        DIAGONAL_SLIDES.get_unchecked(
-            metadata.offset + x86_64::_pext_u64(blockers.0, metadata.mask.0) as usize,
-        )
-    }
-}
-
-#[cfg(not(target_feature = "bmi2"))]
-/// Returns the bitboard of every square a rook can reach when on the passed `origin` square.
-/// The `blockers` bitboard allows one to restrict the rook's movement, as a bishop cannot jump over
-/// a "blocker" (although it can eat it).
-///
-/// This function may be implemented using PEXT on systems supporting this feature and will
-/// otherwise use magic bitboards.
-///
-/// # Example
-/// Given a bishop on D4, and a set of blockers:
-/// ```text
-/// . 1 . . . . . 1
-/// . 1 . . 1 . . .
-/// . . . 1 . . . .
-/// . . . . . . . .
-/// . . . X . . 1 .
-/// . . . . . . . .
-/// 1 1 . . . 1 . .
-/// . . . 1 . . . .
-/// ```
-///
-/// The result would be:
-/// ```text
-/// . . . . . . . 1
-/// 1 . . . . . 1 .
-/// . 1 . . . 1 . .
-/// . . 1 . 1 . . .
-/// . . . X . . . .
-/// . . 1 . 1 . . .
-/// . 1 . . . 1 . .
-/// . . . . . . . .
-/// ```
-///
-/// Where the square marked with an `X` is where our bishop is. Notice how the final output includes
-/// the squares of the blockers reachable by the bishop. Likewise note how the blockers on the edges
-/// of the board didn't make any difference to the output.
-pub fn bishop_slides(origin: Square, blockers: BitBoard) -> BitBoard {
-    let metadata = DIAGONAL_META[origin];
-    unsafe {
-        *SLIDES.get_unchecked(
-            metadata.offset
-                + ((blockers & metadata.mask).0.wrapping_mul(metadata.magic) >> (64 - 9)) as usize,
-        )
-    }
+    BISHOP_SLIDES[metadata.create_global_index(blockers)]
 }
 
 /// Returns a bitboard of all squares that a knight could move to if on the passed square
@@ -368,7 +256,7 @@ pub fn line_between(a: Square, b: Square) -> BitBoard {
 pub mod zobrist {
     use hash_bootstrap::{Color, Square};
 
-    use crate::repr::{CastlingRights, ColoredPieceTable, Piece, PieceKind};
+    use crate::repr::{CastlingRights, Piece, PieceBoard, PieceKind};
 
     use super::ZOBRIST_MAP;
 
@@ -381,7 +269,7 @@ pub mod zobrist {
         }
     }
 
-    /// Generates the Zobrist hash-core for the file an en-passant is available on a particular file.
+    /// Generates the Zobrist hash-core for the file an en passant is available on a particular file.
     /// This is used to distinguish boards beyond their piece configuration.
     ///
     /// If there is no such file, this shouldn't be applied.
@@ -430,7 +318,7 @@ pub mod zobrist {
 
     /// Generates the Zobrist hash-core for a [`ColoredPieceTable`], by using [`zobrist::piece`] on each
     /// piece in the table individually.
-    pub fn piece_table(piece_table: &ColoredPieceTable) -> u64 {
+    pub fn piece_table(piece_table: &PieceBoard) -> u64 {
         piece_table
             .pieces()
             .iter()
