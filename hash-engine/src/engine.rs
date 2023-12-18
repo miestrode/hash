@@ -2,6 +2,7 @@ use std::{
     self,
     borrow::BorrowMut,
     error::Error,
+    fmt::Display,
     io::{BufRead, Lines, StdinLock},
     iter,
     num::ParseIntError,
@@ -11,11 +12,14 @@ use std::{
     time::Duration,
 };
 
+use burn_wgpu::Wgpu;
 use hash_core::{
     board::{Board, ParseBoardError},
     repr::{ChessMove, ParseChessMoveError},
 };
+use hash_network::model::ModelConfig;
 use hash_search::{
+    puct::PuctSelector,
     search::{SearchCommand, SearchThread},
     tree::Tree,
 };
@@ -174,10 +178,33 @@ pub enum ProtocolError {
     InputStreamClosed,
 }
 
+enum OutgoingMessage {
+    Ready,
+    Forfeit,
+    Error,
+    BestMove(ChessMove),
+}
+
+impl Display for OutgoingMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ready => "ready\n".fmt(f),
+            Self::Forfeit => "forfeit\n".fmt(f),
+            Self::Error => "error\n".fmt(f),
+            Self::BestMove(chess_move) => writeln!(f, "{chess_move}"),
+        }
+    }
+}
+
 impl<'a> Engine<'a> {
     pub fn new(mut message_reader: MessageReader<'a>) -> Result<Self, Box<dyn Error>> {
         let (command_sender, command_receiver) = mpsc::channel();
         let (best_move_sender, best_move_receiver) = mpsc::channel();
+
+        let selector = PuctSelector::new(4.0);
+        let network = ModelConfig::new().init::<Wgpu>();
+
+        Self::send_message(OutgoingMessage::Ready);
 
         let InitialMessage {
             times,
@@ -186,13 +213,23 @@ impl<'a> Engine<'a> {
         } = message_reader.read_initial_message()?;
 
         Ok(Self {
-            search_thread: SearchThread::new(Tree::new(board), command_receiver, best_move_sender),
+            search_thread: SearchThread::new(
+                Tree::new(board),
+                selector,
+                network,
+                command_receiver,
+                best_move_sender,
+            ),
             command_sender,
             best_move_receiver,
             times,
             increments,
             message_reader,
         })
+    }
+
+    fn send_message(outgoing_message: OutgoingMessage) {
+        print!("{outgoing_message}");
     }
 
     fn calculate_thinking_time(&self) -> Duration {
@@ -205,7 +242,7 @@ impl<'a> Engine<'a> {
         self.command_sender
             .send(SearchCommand::SendAndPlayBestMove)?;
 
-        println!("{}", self.best_move_receiver.recv()?);
+        Self::send_message(OutgoingMessage::BestMove(self.best_move_receiver.recv()?));
 
         Ok(())
     }
@@ -222,9 +259,15 @@ impl<'a> Engine<'a> {
     }
 
     pub fn run(mut self) -> Result<(), Box<dyn Error>> {
-        loop {
-            self.think()?;
-            self.ponder()?;
-        }
+        let error = try {
+            loop {
+                self.think()?;
+                self.ponder()?;
+            }
+        };
+
+        Self::send_message(OutgoingMessage::Error);
+
+        error
     }
 }

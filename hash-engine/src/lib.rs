@@ -1,4 +1,4 @@
-#![feature(error_iter)]
+#![feature(error_iter, try_blocks)]
 mod engine;
 use std::{error::Error, io};
 

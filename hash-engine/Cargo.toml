@@ -10,8 +10,10 @@ edition.workspace = true
 [dependencies]
 hash-bootstrap = { path = "../hash-bootstrap" }
 hash-core = { path = "../hash-core" }
-hash-search = { path = "../hash-search/" }
+hash-search = { path = "../hash-search" }
+hash-network = { path = "../hash-network" }
 thiserror.workspace = true
+burn-wgpu.workspace = true
 
 [lints]
 workspace = true
