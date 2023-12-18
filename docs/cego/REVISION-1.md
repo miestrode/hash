@@ -15,7 +15,7 @@ When displaying raw text in this specification, it should be interpreted as is, 
 ```
 <NAME>
 ```
-where `NAME` is some kind of "name". When this is the case, `<NAME>` is a "parameter", and may be any string, based on the restrictions provided. Throughout the specification, parameters relating to time will always be in nanoseconds, as an integer. This means that 30 seconds would be represented as `30000000000`. Additionally, any Chess moves will be represented in long algebraic notation, as seen in UCI.
+where `NAME` is some kind of "name". When this is the case, `<NAME>` is a "parameter", and may be any string, based on the restrictions provided. Throughout the specification, parameters relating to time will always be in nanoseconds as a 64-bit, non-negative integer. This means that 30 seconds would be represented as `30000000000`. Additionally, any Chess moves will be represented in long algebraic notation, as seen in UCI.
 
 ### Long Algebraic Notation
 Every single move in long Algebraic Notation is of the form:
@@ -86,3 +86,24 @@ When the engine sees fit, instead of sending the expected message, it may send t
 forfeit\n
 ```
 to notify the mediator it has forfeited the game. Once this happens, the game must be terminated, and the engine may quit. Note that there's no need to use this mechanism for ending a game due to an internal engine error, as simply stopping the engine process will terminate the game. Therefore, a forfeit should be considered a win for the other engine, at all times.
+
+## Example
+Below is an example of a communication between two Chess engines and a mediator, for a Chess game starting from the standard position. The mediator is represented by the letter `m`, and the engines by the numbers `1` and `2`.
+
+Each message is preceded by text of the form `<SENDER> -> <RECEIVER>: `, where the `<SENDER>` and `<RECEIVER>` are one of the representations above. These indicate, respectively, the sender and receiver of the message. Comments start with `#`:
+
+```
+# First move. Both engine start with 30 seconds, with an increment of 1 second throughout.
+m -> 1: 30000000000 1000000000 30000000000 1000000000 rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n
+# Engine 1 thinks for 5 seconds.
+1 -> m: e2e4\n
+# First move of second engine. Note that engine 1's time is now 26 (25 + 1) seconds.
+m -> 2: 30000000000 1000000000 26000000000 1000000000 rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1\n
+# Engine 2 thinks for 3 seconds.
+2 -> m: e7e5\n
+# Second move of first engine. Notice that engine 2's time is 28 (27 + 1) seconds.
+m -> 1: 26000000000 28000000000 e7e5\n
+# Engine 1 decides to forfeit the game.
+1 -> m: forfeit\n
+# Engine 1 and 2 are now terminated by the mediator. The game is a win for engine 2.
+```
