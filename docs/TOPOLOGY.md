@@ -17,4 +17,4 @@ Is a binary crate that uses `hash-network` in order to train a network using its
 Is a crate that implements the primary searching logic for the engine, by providing an advanced searching algorithm based on AlphaZero-style MCTS.
 
 ## `hash-engine`
-Is a binary crate functioning as the front-end for the Hash Chess engine. It contains logic for managing search using operations provided by `hash-search` and the networks produced by `hash-train`, and implements the CGCF protocol. It is intended to be used as a command-line program and has a CLI.
+Is a binary crate functioning as the front-end for the Hash Chess engine. It contains logic for managing search using operations provided by `hash-search` and the networks produced by `hash-train`, and implements the CEGO protocol. It is intended to be used as a command-line program and has a CLI.
