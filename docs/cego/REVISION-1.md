@@ -93,6 +93,9 @@ Below is an example of a communication between two Chess engines and a mediator,
 Each message is preceded by text of the form `<SENDER> -> <RECEIVER>: `, where the `<SENDER>` and `<RECEIVER>` are one of the representations above. These indicate, respectively, the sender and receiver of the message. Comments start with `#`:
 
 ```
+# Both engines send that they have finished initialization, at different time frames
+2 -> m: ready\n
+1 -> m ready\n
 # First move. Both engine start with 30 seconds, with an increment of 1 second throughout.
 m -> 1: 30000000000 1000000000 30000000000 1000000000 rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n
 # Engine 1 thinks for 5 seconds.
