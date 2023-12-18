@@ -10,7 +10,7 @@ Hash is currently in the process of being written, and has not officially releas
 ## CEGO (or, why Hash doesn't support UCI)
 Hash doesn't support UCI, and instead uses its bespoke protocol, CEGO (Chess Engine Game Operation). The reasons for this are partially explained in [here](docs/cego/REVISION-1.md). It suffices to say, we felt UCI and similar protocols weren't good choices given the use cases for this engine.
 
-### Documentation
+## Documentation
 As we feel Hash is a sufficiently large project, documentation explaining things such as its current network structure and things of the like can be seen in [here](docs/). Note that documentation is currently largely incomplete.
 
 ## Contributing
