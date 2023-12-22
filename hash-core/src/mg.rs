@@ -64,7 +64,7 @@ trait Gen {
             BitBoard::FULL
         };
 
-        moves.extend((pieces - board.pinned).bits().flat_map(|piece| {
+        moves.extend((pieces & !board.pinned).bits().flat_map(|piece| {
             (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
                 & valid_targets)
                 .bits()
@@ -117,9 +117,9 @@ impl Pawn {
         let king_square = unsafe { Square::try_from(board.us.king).unwrap_unchecked() };
 
         // Test for any rays hitting the king
-        ((index::bishop_slides(king_square, occupation) & (board.them.queens + board.them.bishops))
-            + (index::rook_slides(king_square, occupation)
-                & (board.them.queens + board.them.rooks)))
+        ((index::bishop_slides(king_square, occupation) & (board.them.queens | board.them.bishops))
+            | (index::rook_slides(king_square, occupation)
+                & (board.them.queens | board.them.rooks)))
             .is_empty()
     }
 }
@@ -135,8 +135,8 @@ impl Gen for Pawn {
     ) -> BitBoard {
         index::pawn_moves(
             origin,
-            friendly_occupation - origin.into(),
-            occupation - friendly_occupation,
+            friendly_occupation & !BitBoard::from(origin),
+            occupation & !friendly_occupation,
             color,
         )
     }
@@ -164,14 +164,14 @@ impl Gen for Pawn {
             BitBoard::FULL
         };
 
-        moves.extend((board.us.pawns - board.pinned).bits().flat_map(|piece| {
+        moves.extend((board.us.pawns & !board.pinned).bits().flat_map(|piece| {
             ((Self::pseudo_legal_moves(
                 piece,
                 board.us.occupation,
                 occupation,
                 board.playing_color,
             ) & valid_targets)
-                - BitBoard::EDGE_RANKS)
+                & !BitBoard::EDGE_RANKS)
                 .bits()
                 .map(move |target| ChessMove {
                     origin: piece,
@@ -181,7 +181,7 @@ impl Gen for Pawn {
         }));
 
         // Promotions
-        moves.extend((board.us.pawns - board.pinned).bits().flat_map(|piece| {
+        moves.extend((board.us.pawns & !board.pinned).bits().flat_map(|piece| {
             (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
                 & valid_targets
                 & BitBoard::EDGE_RANKS)
@@ -205,7 +205,7 @@ impl Gen for Pawn {
                     occupation,
                     board.playing_color,
                 ) & index::line_fit(king_square, piece))
-                    - BitBoard::EDGE_RANKS)
+                    & !BitBoard::EDGE_RANKS)
                     .bits()
                     .map(move |target| ChessMove {
                         origin: piece,
@@ -272,7 +272,7 @@ impl Gen for Knight {
         _occupation: BitBoard,
         _color: Color,
     ) -> BitBoard {
-        index::knight_attacks(origin) - friendly_occupation
+        index::knight_attacks(origin) & !friendly_occupation
     }
 
     // This is essentially identical to the regular `legal_moves`, except we don't care about pinned
@@ -300,7 +300,7 @@ impl Gen for Knight {
             BitBoard::FULL
         };
 
-        moves.extend((board.us.knights - board.pinned).bits().flat_map(|piece| {
+        moves.extend((board.us.knights & !board.pinned).bits().flat_map(|piece| {
             (Self::pseudo_legal_moves(piece, board.us.occupation, occupation, board.playing_color)
                 & valid_targets)
                 .bits()
@@ -324,7 +324,7 @@ impl Gen for Bishop {
         occupation: BitBoard,
         _color: Color,
     ) -> BitBoard {
-        index::bishop_slides(origin, occupation) - friendly_occupation
+        index::bishop_slides(origin, occupation) & !friendly_occupation
     }
 }
 
@@ -339,7 +339,7 @@ impl Gen for Rook {
         occupation: BitBoard,
         _color: Color,
     ) -> BitBoard {
-        index::rook_slides(origin, occupation) - friendly_occupation
+        index::rook_slides(origin, occupation) & !friendly_occupation
     }
 }
 
@@ -354,8 +354,8 @@ impl Gen for Queen {
         occupation: BitBoard,
         _color: Color,
     ) -> BitBoard {
-        index::rook_slides(origin, occupation) + index::bishop_slides(origin, occupation)
-            - friendly_occupation
+        (index::rook_slides(origin, occupation) | index::bishop_slides(origin, occupation))
+            & !friendly_occupation
     }
 }
 
@@ -370,7 +370,7 @@ impl Gen for King {
         _occupation: BitBoard,
         _color: Color,
     ) -> BitBoard {
-        index::king_attacks(origin) - friendly_occupation
+        index::king_attacks(origin) & !friendly_occupation
     }
 
     fn legal_moves<C: CheckType>(board: &Board, moves: &mut Moves) {

@@ -17,16 +17,16 @@ fn gen_ray(
     (loop {
         // Basically, you can at most go to positions occupied by blockers, not past them. Because
         // of this, ray positions with blockers in them are removed, so they won't be advanced
-        let moveable_rays = rays - blockers;
+        let moveable_rays = rays & !blockers;
 
-        let next_rays = rays + update_fn(moveable_rays);
+        let next_rays = rays | update_fn(moveable_rays);
 
         if rays == next_rays {
             break rays;
         }
 
         rays = next_rays;
-    }) - pieces
+    }) & !pieces
 }
 
 fn gen_separated_cross_slides(
@@ -52,7 +52,7 @@ fn gen_separated_cross_slides(
 fn gen_rook_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
     let (up, right, down, left) = gen_separated_cross_slides(pieces, blockers);
 
-    up + right + down + left
+    up | right | down | left
 }
 
 fn gen_bishop_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
@@ -78,7 +78,8 @@ fn gen_bishop_slides(pieces: BitBoard, blockers: BitBoard) -> BitBoard {
 
     let (up_left, up_right, down_right, down_left) =
         gen_separated_diagonal_slides(pieces, blockers);
-    up_left + up_right + down_right + down_left
+
+    up_left | up_right | down_right | down_left
 }
 
 fn gen_knight_index(piece: BitBoard) -> BitBoard {
@@ -88,31 +89,31 @@ fn gen_knight_index(piece: BitBoard) -> BitBoard {
     let right = piece.move_one_right(Color::White);
 
     top.move_one_up_right(Color::White)
-        + top.move_one_up_left(Color::White)
-        + left.move_one_up_left(Color::White)
-        + left.move_one_down_left(Color::White)
-        + bottom.move_one_down_left(Color::White)
-        + bottom.move_one_down_right(Color::White)
-        + right.move_one_up_right(Color::White)
-        + right.move_one_down_right(Color::White)
+        | top.move_one_up_left(Color::White)
+        | left.move_one_up_left(Color::White)
+        | left.move_one_down_left(Color::White)
+        | bottom.move_one_down_left(Color::White)
+        | bottom.move_one_down_right(Color::White)
+        | right.move_one_up_right(Color::White)
+        | right.move_one_down_right(Color::White)
 }
 
 fn gen_king_index(piece: BitBoard) -> BitBoard {
-    let line = piece.move_one_left(Color::White) + piece + piece.move_one_right(Color::White);
-    line.move_one_up(Color::White) + line + line.move_one_down(Color::White) - piece
+    let line = piece.move_one_left(Color::White) | piece | piece.move_one_right(Color::White);
+    (line.move_one_up(Color::White) | line | line.move_one_down(Color::White)) & !piece
 }
 
 fn gen_rook_mask(piece: BitBoard) -> BitBoard {
     let (up, right, down, left) = gen_separated_cross_slides(piece, BitBoard::EMPTY);
     let correct_edges =
-        (BitBoard::EDGE_FILES - (up + down)) + (BitBoard::EDGE_RANKS - (left + right));
+        (BitBoard::EDGE_FILES & !(up | down)) | (BitBoard::EDGE_RANKS & !(left | right));
 
     // All slide collections blocked by pieces will be subsets of this template
-    up + right + down + left - correct_edges
+    (up | right | down | left) & !correct_edges
 }
 
 fn gen_bishop_mask(piece: BitBoard) -> BitBoard {
-    gen_bishop_slides(piece, BitBoard::EMPTY) - BitBoard::EDGES
+    gen_bishop_slides(piece, BitBoard::EMPTY) & !BitBoard::EDGES
 }
 
 fn gen_piece_table(move_fn: impl Fn(BitBoard) -> BitBoard) -> Vec<BitBoard> {
@@ -205,7 +206,7 @@ fn main() -> Result<(), Error> {
         &array::from_fn::<_, 64, _>(|index| {
             let square: BitBoard = Square::try_from(index as u8).unwrap().into();
 
-            square.move_one_up_left(Color::White) + square.move_one_up_right(Color::White)
+            square.move_one_up_left(Color::White) | square.move_one_up_right(Color::White)
         })
     );
 
@@ -215,7 +216,7 @@ fn main() -> Result<(), Error> {
         &array::from_fn::<_, 64, _>(|index| {
             let square: BitBoard = Square::try_from(index as u8).unwrap().into();
 
-            square.move_one_up_left(Color::Black) + square.move_one_up_right(Color::Black)
+            square.move_one_up_left(Color::Black) | square.move_one_up_right(Color::Black)
         })
     );
 
@@ -227,7 +228,7 @@ fn main() -> Result<(), Error> {
             let square_as_bitboard: BitBoard = square.into();
 
             square_as_bitboard.move_one_up(Color::White)
-                + if square.rank() == 1 {
+                | if square.rank() == 1 {
                 square_as_bitboard.move_two_up(Color::White)
             } else {
                 BitBoard::EMPTY
@@ -243,7 +244,7 @@ fn main() -> Result<(), Error> {
             let square_as_bitboard: BitBoard = square.into();
 
             square_as_bitboard.move_one_up(Color::Black)
-                + if square.rank() == 6 {
+                | if square.rank() == 6 {
                     square_as_bitboard.move_two_up(Color::Black)
                 } else {
                     BitBoard::EMPTY
@@ -262,7 +263,7 @@ fn main() -> Result<(), Error> {
                 .into_iter()
                 .filter(|&square| square.on_line(first_square, second_square))
                 .map(BitBoard::from)
-                .fold(BitBoard::EMPTY, |board, square| board + square)
+                .fold(BitBoard::EMPTY, |board, square| board | square)
         })
     );
 
@@ -281,7 +282,7 @@ fn main() -> Result<(), Error> {
                         && (square != first_square)
                         && (square != second_square)
                 })
-                .fold(BitBoard::EMPTY, |board, square| board + square.into())
+                .fold(BitBoard::EMPTY, |board, square| board | square.into())
         })
     );
 

@@ -35,19 +35,19 @@ impl Board {
 
     pub fn is_attacked(&self, square: Square) -> bool {
         let mut attackers = BitBoard::EMPTY;
-        let occupation = self.occupation() - self.us.king;
+        let occupation = self.occupation() & !self.us.king;
 
-        attackers += index::rook_slides(square, occupation) & (self.them.rooks + self.them.queens);
-        attackers +=
-            index::bishop_slides(square, occupation) & (self.them.bishops + self.them.queens);
+        attackers |= index::rook_slides(square, occupation) & (self.them.rooks | self.them.queens);
+        attackers |=
+            index::bishop_slides(square, occupation) & (self.them.bishops | self.them.queens);
 
-        attackers += index::knight_attacks(square) & self.them.knights;
-        attackers += index::king_attacks(square) & self.them.king;
+        attackers |= index::knight_attacks(square) & self.them.knights;
+        attackers |= index::king_attacks(square) & self.them.king;
 
         let square: BitBoard = square.into();
 
-        attackers += (square.move_one_up_left(self.playing_color)
-            + square.move_one_up_right(self.playing_color))
+        attackers |= (square.move_one_up_left(self.playing_color)
+            | square.move_one_up_right(self.playing_color))
             & self.them.pawns;
 
         !attackers.is_empty()
@@ -58,7 +58,7 @@ impl Board {
     }
 
     pub fn occupation(&self) -> BitBoard {
-        self.us.occupation + self.them.occupation
+        self.us.occupation | self.them.occupation
     }
 
     pub fn piece(&self, square: Square) -> Option<Piece> {
@@ -105,9 +105,9 @@ impl Board {
 
         // Get all the sliding pieces that could be attacking the king
         let attackers = (index::rook_slides(king_square, self.them.occupation)
-            & (self.them.rooks + self.them.queens))
-            + (index::bishop_slides(king_square, self.them.occupation)
-                & (self.them.bishops + self.them.queens));
+            & (self.them.rooks | self.them.queens))
+            | (index::bishop_slides(king_square, self.them.occupation)
+                & (self.them.bishops | self.them.queens));
 
         // Update pins
         for attacker in attackers.bits() {
@@ -194,7 +194,9 @@ impl Board {
         let move_bitboard = BitBoard::from(chess_move.origin) ^ chess_move.target.into();
 
         // TODO: Check if replacing this with a more rudimentary check would be faster
-        if moved_piece_kind == PieceKind::King && move_bitboard <= BitBoard::KING_CASTLE_MOVES {
+        if moved_piece_kind == PieceKind::King
+            && move_bitboard.is_subset_of(BitBoard::KING_CASTLE_MOVES)
+        {
             // This must mean the move was a castle.
             let king_square = chess_move.origin.as_index() as u8;
 
@@ -235,9 +237,9 @@ impl Board {
 
         // Get all the sliding pieces that could be attacking the enemy king
         let attackers = (index::rook_slides(enemy_king_square, self.us.occupation)
-            & (self.us.rooks + self.us.queens))
-            + (index::bishop_slides(enemy_king_square, self.us.occupation)
-                & (self.us.bishops + self.us.queens));
+            & (self.us.rooks | self.us.queens))
+            | (index::bishop_slides(enemy_king_square, self.us.occupation)
+                & (self.us.bishops | self.us.queens));
 
         // Update pins
         for attacker in attackers.bits() {
@@ -312,8 +314,10 @@ pub enum ParseBoardError {
     InvalidCastlingRights,
     #[error("half-move clock should be a non-negative integer")]
     InvalidHalfMoveClock(#[source] ParseIntError),
-    #[error("full-move number should be a non-negative integer, not smaller than the half-move clock over 2, floored")]
-    InvalidFullMoveNumber(#[source] Option<ParseIntError>),
+    #[error("half-move clock must be not larger than twice the full-move number")]
+    IllegalHalfMoveClock,
+    #[error("full-move number should be a non-negative integer")]
+    InvalidFullMoveNumber(#[source] ParseIntError),
     #[error("provided board allows for the capture of a king")]
     CapturableKing,
     #[error("provided board has pawns on edge ranks")]
@@ -346,17 +350,17 @@ impl FromStr for Board {
                 ),
             };
 
-            let ply_clock = match parts[4].parse::<u8>() {
-                Ok(ply_clock) => ply_clock,
-                Err(error) if *error.kind() == IntErrorKind::PosOverflow => u8::MAX,
-                Err(error) => return Err(ParseBoardError::InvalidHalfMoveClock(error)),
+            let full_moves = match parts[5].parse::<u16>() {
+                Ok(full_moves) => full_moves,
+                Err(error) if *error.kind() == IntErrorKind::PosOverflow => u16::MAX,
+                Err(error) => return Err(ParseBoardError::InvalidFullMoveNumber(error)),
             };
 
-            let full_moves = match parts[5].parse::<u16>() {
-                Ok(full_moves) if full_moves >= ply_clock as u16 / 2 => full_moves,
-                Ok(_) => return Err(ParseBoardError::InvalidFullMoveNumber(None)),
-                Err(error) if *error.kind() == IntErrorKind::PosOverflow => u16::MAX,
-                Err(error) => return Err(ParseBoardError::InvalidFullMoveNumber(Some(error))),
+            let ply_clock = match parts[4].parse::<u8>() {
+                Ok(ply_clock) if ply_clock as u16 <= full_moves * 2 => ply_clock,
+                Ok(_) => return Err(ParseBoardError::IllegalHalfMoveClock),
+                Err(error) if *error.kind() == IntErrorKind::PosOverflow => u8::MAX,
+                Err(error) => return Err(ParseBoardError::InvalidHalfMoveClock(error)),
             };
 
             let mut white = Player::blank();
@@ -441,37 +445,13 @@ impl FromStr for Board {
                 is_impossible_capture_square || with_mismatching_pawn
             });
 
-            let mut enemy_king_checkers = BitBoard::EMPTY;
-
-            let king_square = unsafe { Square::try_from(board.them.king).unwrap_unchecked() };
-
-            enemy_king_checkers ^= index::knight_attacks(king_square) & board.us.knights;
-            enemy_king_checkers ^=
-                index::pawn_attacks(king_square, !current_color) & board.us.pawns;
-
-            // Get all the sliding pieces that could be attacking the enemy king
-            let attackers = (index::rook_slides(king_square, board.us.occupation)
-                & (board.us.rooks + board.us.queens))
-                + (index::bishop_slides(king_square, board.us.occupation)
-                    & (board.us.bishops + board.us.queens));
-
-            // Update pins
-            for attacker in attackers.bits() {
-                let pieces_between =
-                    index::line_between(attacker, king_square) & board.them.occupation;
-
-                if pieces_between.is_empty() {
-                    enemy_king_checkers ^= attacker.into();
-                }
-            }
-
             if !board.us.king.is_a_single_one() || !board.them.king.is_a_single_one() {
                 Err(ParseBoardError::InvalidKingCount)
             } else if !(board.us.pawns & BitBoard::EDGE_RANKS).is_empty() {
                 Err(ParseBoardError::PawnsOnEdgeRanks)
             } else if is_impossible_en_passant_square {
                 Err(ParseBoardError::InvalidEnPassantSquare(None))
-            } else if !enemy_king_checkers.is_empty() {
+            } else if board.is_attacked(Square::try_from(board.them.king).unwrap()) {
                 Err(ParseBoardError::CapturableKing)
             } else {
                 Ok(board)

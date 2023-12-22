@@ -1,13 +1,13 @@
 [package]
 name = "hash-core"
-description = "Core game-related constructs for the Hash Chess Engine"
+description = "Core game-related constructs for the Hash Chess engine"
 version.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-hash-bootstrap = { path = "../hash-bootstrap" }
+hash-bootstrap.workspace = true
 rustifact.workspace = true
 rand.workspace = true
 
@@ -15,7 +15,7 @@ rand.workspace = true
 test-case.workspace = true
 
 [dependencies]
-hash-bootstrap = { path = "../hash-bootstrap" }
+hash-bootstrap.workspace = true
 rustifact.workspace = true
 arrayvec.workspace = true
 thiserror.workspace = true

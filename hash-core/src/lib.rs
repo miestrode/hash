@@ -32,11 +32,36 @@ mod tests {
     #[test_case("rnbqkbnr/ppp1pppp/8/8/1PPpP3/8/P2P1PPP/RNBQKBNR b KQkq c3 0 3"; "en passant test")]
     #[test_case("r1bq1b1r/ppppk1pp/2n2n2/4pp2/2B1PP2/5N2/PPPP2PP/RNBQ1RK1 w - - 6 6"; "no castling test")]
     #[test_case("1nbqkbnr/1ppppppp/r7/p7/7P/7R/PPPPPPP1/RNBQKBN1 w Qk - 2 3"; "partial castling test")]
-    fn fen_tests(fen_string: &str) {
+    fn circular_fen_tests(fen_string: &str) {
         assert_eq!(
             fen_string,
             &Board::from_str(fen_string).unwrap().to_string()
         );
+    }
+
+    #[should_panic]
+    #[test_case("rnbqkbnr/pppppppp/8/8/9/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; "invalid row spacing 1")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PP3PPPPP/RNBQKBNR w KQkq - 0 1"; "invalid row spacing 2")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPPP/RNBQKBNR w KQkq - 0 1"; "invalid row spacing 3")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPWPPPPP/RNBQKBNR w KQkq - 0 1"; "invalid piece character")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR l KQkq - 0 1"; "invalid color character")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w  - 0 1"; "invalid castling information 1")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KK - 0 1"; "invalid castling information 2")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KW - 0 1"; "invalid castling information 3")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq aa 0 1"; "invalid en passant square")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e4 0 1"; "illegal en passant square")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - a 1"; "invalid half move clock")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 3 1"; "illegal half move clock")]
+    #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 a"; "invalid full move number")]
+    #[test_case("8/8/8/8/3k4/3K4/8/8 w - - 0 1"; "capturable king 1")]
+    #[test_case("8/8/8/8/3k4/8/5B2/K7 w - - 0 1"; "capturable king 2")]
+    #[test_case("8/8/8/8/3k4/8/4N3/K7 w - - 0 1"; "capturable king 3")]
+    #[test_case("8/8/8/8/3k4/3PP3/8/K7 w - - 0 1"; "capturable king 4")]
+    #[test_case("8/8/8/8/3k4/8/8/8 w - - 0 1"; "invalid king number 1")]
+    #[test_case("8/8/8/8/3k1k2/8/8/8 w - - 0 1"; "invalid king number 2")]
+    #[test_case("k3PP2/8/8/8/8/8/8/K7 w - - 0 1"; "edge rank pawns")]
+    fn invalid_fen_tests(fen_string: &str) {
+        Board::from_str(fen_string).unwrap();
     }
 
     #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 3, 8902; "starting position depth 3")]

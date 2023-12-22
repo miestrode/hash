@@ -157,15 +157,15 @@ pub fn pawn_moves(
     enemy_blockers: BitBoard,
     color: Color,
 ) -> BitBoard {
-    let blockers = friendly_blockers + enemy_blockers;
+    let blockers = friendly_blockers | enemy_blockers;
     let smear = blockers.smear_one_up(color);
 
     match color {
         Color::White => {
-            (WHITE_PAWN_ATTACKS[origin] & enemy_blockers) + (WHITE_PAWN_PUSHES[origin] - smear)
+            (WHITE_PAWN_ATTACKS[origin] & enemy_blockers) | (WHITE_PAWN_PUSHES[origin] & !smear)
         }
         Color::Black => {
-            (BLACK_PAWN_ATTACKS[origin] & enemy_blockers) + (BLACK_PAWN_PUSHES[origin] - smear)
+            (BLACK_PAWN_ATTACKS[origin] & enemy_blockers) | (BLACK_PAWN_PUSHES[origin] & !smear)
         }
     }
 }

@@ -1,5 +1,6 @@
 [package]
 name = "hash-network"
+description = "Hash Chess engine neural network definition"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -7,8 +8,8 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hash-bootstrap = { path = "../hash-bootstrap" }
-hash-core = { path = "../hash-core" }
+hash-bootstrap.workspace = true
+hash-core.workspace = true
 burn.workspace = true
 serde.workspace = true
 

@@ -1,6 +1,6 @@
 [package]
 name = "hash-train"
-description = "Training binary for the Hash Chess Engine"
+description = "Training binary for the Hash Chess engine"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -8,16 +8,16 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hash-core = { path = "../hash-core" }
-hash-bootstrap = { path = "../hash-bootstrap" }
-hash-search = { path = "../hash-search" }
-hash-network = { path = "../hash-network" }
-burn = { version = "0.11.1", features = ["train"] }
-burn-wgpu = "0.11.1"
-serde = "1.0.188"
-ringbuffer = "0.15.0"
-arrayvec = "0.7.4"
-rand = "0.8.5"
+hash-bootstrap.workspace = true
+hash-core.workspace = true
+hash-search.workspace = true
+hash-network.workspace = true
+burn = { workspace = true, features = ["autodiff"] }
+burn-wgpu.workspace = true
+serde.workspace = true
+ringbuffer.workspace = true
+arrayvec.workspace = true
+rand.workspace = true
 
 [lints]
 workspace = true

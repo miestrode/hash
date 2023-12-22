@@ -8,12 +8,15 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hash-bootstrap = { path = "../hash-bootstrap" }
-hash-core = { path = "../hash-core" }
-hash-search = { path = "../hash-search" }
-hash-network = { path = "../hash-network" }
+hash-bootstrap.workspace = true
+hash-core.workspace = true
+hash-search.workspace = true
+hash-network.workspace = true
 thiserror.workspace = true
 burn-wgpu.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

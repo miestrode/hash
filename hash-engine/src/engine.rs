@@ -20,7 +20,7 @@ use hash_core::{
 use hash_network::model::ModelConfig;
 use hash_search::{
     puct::PuctSelector,
-    search::{SearchCommand, SearchThread},
+    search::{self, SearchCommand},
     tree::Tree,
 };
 
@@ -51,7 +51,6 @@ pub enum ParseInitialMessageError {
     InvalidBoard(#[source] ParseBoardError),
 }
 
-// FIXME: This should collect to a vector and use a length check, anything else is invalid
 impl FromStr for InitialMessage {
     type Err = ParseInitialMessageError;
 
@@ -164,7 +163,6 @@ pub struct Engine<'a> {
     times: TimeData,
     increments: IncrementData,
     message_reader: MessageReader<'a>,
-    search_thread: SearchThread,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -180,7 +178,6 @@ pub enum ProtocolError {
 
 enum OutgoingMessage {
     Ready,
-    Forfeit,
     Error,
     BestMove(ChessMove),
 }
@@ -189,7 +186,6 @@ impl Display for OutgoingMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Ready => "ready\n".fmt(f),
-            Self::Forfeit => "forfeit\n".fmt(f),
             Self::Error => "error\n".fmt(f),
             Self::BestMove(chess_move) => writeln!(f, "{chess_move}"),
         }
@@ -212,14 +208,15 @@ impl<'a> Engine<'a> {
             board,
         } = message_reader.read_initial_message()?;
 
+        search::start_search_thread(
+            Tree::new(board),
+            selector,
+            network,
+            command_receiver,
+            best_move_sender,
+        );
+
         Ok(Self {
-            search_thread: SearchThread::new(
-                Tree::new(board),
-                selector,
-                network,
-                command_receiver,
-                best_move_sender,
-            ),
             command_sender,
             best_move_receiver,
             times,

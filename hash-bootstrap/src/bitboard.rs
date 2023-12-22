@@ -1,8 +1,7 @@
 use std::{
-    cmp::Ordering,
     fmt::{self, Display},
     iter,
-    ops::{Add, AddAssign, BitAnd, BitXor, BitXorAssign, Not, Shl, Shr, Sub},
+    ops::{BitAnd, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},
     str::FromStr,
 };
 
@@ -454,6 +453,14 @@ impl BitBoard {
         }
     }
 
+    fn shift_visually_right(self, squares: u8) -> Self {
+        Self(self.0 << squares)
+    }
+
+    fn shift_visually_left(self, squares: u8) -> Self {
+        Self(self.0 >> squares)
+    }
+
     /// Moves the bits in this bitboard a rank up, relative to the color supplied. This means that
     /// if the color supplied is [`Black`](Color::Black) for example, the result will be "up" from
     /// black's side.
@@ -461,8 +468,8 @@ impl BitBoard {
     /// If any bits would be moved out of the board, they will "disappear".
     pub fn move_one_up(self, color: Color) -> Self {
         match color {
-            Color::White => (self - Self::RANK_8) >> 8,
-            Color::Black => (self - Self::RANK_1) << 8,
+            Color::White => (self & !Self::RANK_8).shift_visually_right(8),
+            Color::Black => (self & !Self::RANK_1).shift_visually_left(8),
         }
     }
 
@@ -473,8 +480,8 @@ impl BitBoard {
     /// If any bits would be moved out of the board, they will "disappear".
     pub fn move_two_up(self, color: Color) -> Self {
         match color {
-            Color::White => (self - (Self::RANK_7 + Self::RANK_8)) >> 16,
-            Color::Black => (self - (Self::RANK_1 + Self::RANK_2)) << 16,
+            Color::White => (self & !(Self::RANK_7 | Self::RANK_8)).shift_visually_right(16),
+            Color::Black => (self & !(Self::RANK_1 | Self::RANK_2)).shift_visually_left(16),
         }
     }
 
@@ -494,8 +501,8 @@ impl BitBoard {
     /// If any bits would be moved out of the board, they will "disappear".
     pub fn move_one_right(self, color: Color) -> Self {
         match color {
-            Color::White => (self - Self::H_FILE) >> 1,
-            Color::Black => (self - Self::A_FILE) << 1,
+            Color::White => (self & !Self::H_FILE).shift_visually_right(1),
+            Color::Black => (self & !Self::A_FILE).shift_visually_left(1),
         }
     }
 
@@ -663,7 +670,11 @@ impl BitBoard {
     ///
     /// Notice the bit duplication.
     pub fn smear_one_up(self, color: Color) -> Self {
-        self.move_one_up(color) + self
+        self.move_one_up(color) | self
+    }
+
+    pub fn is_subset_of(&self, other: Self) -> bool {
+        *self & other == *self
     }
 }
 
@@ -702,50 +713,17 @@ impl BitAnd for BitBoard {
     }
 }
 
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl Sub for BitBoard {
+impl BitOr for BitBoard {
     type Output = Self;
 
-    fn sub(self, rhs: Self) -> Self::Output {
-        self & !rhs
-    }
-}
-
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl Add for BitBoard {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
+    fn bitor(self, rhs: Self) -> Self::Output {
         Self(self.0 | rhs.0)
     }
 }
 
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl AddAssign for BitBoard {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-// NOTE: Wait, what? Yes, the shifts are flipped. This is because the bit board uses a little-endian
-// rank-file representation, which basically means that the board bits are placed from left to
-// right. Therefore, a left shift on a bit board would really be a right shift on a collection of
-// bits.
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl Shl<u32> for BitBoard {
-    type Output = Self;
-
-    fn shl(self, rhs: u32) -> Self::Output {
-        BitBoard(self.0 >> rhs)
-    }
-}
-
-#[allow(clippy::suspicious_arithmetic_impl)]
-impl Shr<u32> for BitBoard {
-    type Output = Self;
-
-    fn shr(self, rhs: u32) -> Self::Output {
-        BitBoard(self.0 << rhs)
+impl BitOrAssign for BitBoard {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs;
     }
 }
 
@@ -760,23 +738,5 @@ impl BitXor for BitBoard {
 impl BitXorAssign for BitBoard {
     fn bitxor_assign(&mut self, rhs: Self) {
         *self = *self ^ rhs;
-    }
-}
-
-impl PartialOrd for BitBoard {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self == other {
-            Some(Ordering::Equal)
-        } else {
-            let intersection = *self & *other;
-
-            if intersection == *self {
-                Some(Ordering::Less)
-            } else if intersection == *other {
-                Some(Ordering::Greater)
-            } else {
-                None
-            }
-        }
     }
 }

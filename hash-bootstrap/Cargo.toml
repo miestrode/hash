@@ -1,6 +1,6 @@
 [package]
 name = "hash-bootstrap"
-description = "Fundamental structures for the hash-core build script and general usage"
+description = "Fundamental data structures for the Hash Chess engine's build script and general usage"
 version.workspace = true
 edition.workspace = true
 

@@ -1,6 +1,6 @@
 [package]
 name = "hash-search"
-description = "AlphaZero-style MCTS system for the Hash Chess Engine"
+description = "Search code for the Hash Chess engine"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -8,9 +8,9 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hash-core = { path = "../hash-core" }
-hash-bootstrap = { path = "../hash-bootstrap" }
-hash-network = { path = "../hash-network" }
+hash-core.workspace = true
+hash-bootstrap.workspace = true
+hash-network.workspace = true
 arrayvec.workspace = true
 num-traits.workspace = true
 rand = { workspace = true, features = ["min_const_gen"] }
