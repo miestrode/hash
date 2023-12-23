@@ -385,7 +385,7 @@ impl Gen for King {
                 board.playing_color,
             )
             .bits()
-            .filter(|square| !board.is_attacked(*square))
+            .filter(|square| !board.is_attacked_by_them(*square))
             .map(|target| ChessMove {
                 origin: king_square,
                 target,
@@ -401,7 +401,7 @@ impl Gen for King {
                 && (king_side_castle_mask & board.occupation()).is_empty()
                 && (king_side_castle_mask
                     .bits()
-                    .all(|square| !board.is_attacked(square)))
+                    .all(|square| !board.is_attacked_by_them(square)))
             {
                 moves.push(ChessMove {
                     origin: king_square,
@@ -419,7 +419,7 @@ impl Gen for King {
                 .is_empty()
                 && (BitBoard::queen_side_castle_attack_mask(board.playing_color)
                     .bits()
-                    .all(|square| !board.is_attacked(square)))
+                    .all(|square| !board.is_attacked_by_them(square)))
             {
                 moves.push(ChessMove {
                     origin: king_square,

@@ -33,7 +33,7 @@ impl Board {
         Self::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
     }
 
-    pub fn is_attacked(&self, square: Square) -> bool {
+    pub fn is_attacked_by_them(&self, square: Square) -> bool {
         let mut attackers = BitBoard::EMPTY;
         let occupation = self.occupation() & !self.us.king;
 
@@ -49,6 +49,25 @@ impl Board {
         attackers |= (square.move_one_up_left(self.playing_color)
             | square.move_one_up_right(self.playing_color))
             & self.them.pawns;
+
+        !attackers.is_empty()
+    }
+
+    pub fn is_attacked_by_us(&self, square: Square) -> bool {
+        let mut attackers = BitBoard::EMPTY;
+        let occupation = self.occupation() & !self.them.king;
+
+        attackers |= index::rook_slides(square, occupation) & (self.us.rooks | self.us.queens);
+        attackers |= index::bishop_slides(square, occupation) & (self.us.bishops | self.us.queens);
+
+        attackers |= index::knight_attacks(square) & self.us.knights;
+        attackers |= index::king_attacks(square) & self.us.king;
+
+        let square: BitBoard = square.into();
+
+        attackers |= (square.move_one_up_left(!self.playing_color)
+            | square.move_one_up_right(!self.playing_color))
+            & self.us.pawns;
 
         !attackers.is_empty()
     }
@@ -97,8 +116,7 @@ impl Board {
     }
 
     pub fn update_move_restrictions(&mut self) {
-        // SAFETY: The board is assumed to be validly constructed
-        let king_square = unsafe { Square::try_from(self.us.king).unwrap_unchecked() };
+        let king_square = Square::try_from(self.us.king).unwrap();
 
         self.checkers ^= index::knight_attacks(king_square) & self.them.knights;
         self.checkers ^= index::pawn_attacks(king_square, self.playing_color) & self.them.pawns;
@@ -451,7 +469,7 @@ impl FromStr for Board {
                 Err(ParseBoardError::PawnsOnEdgeRanks)
             } else if is_impossible_en_passant_square {
                 Err(ParseBoardError::InvalidEnPassantSquare(None))
-            } else if board.is_attacked(Square::try_from(board.them.king).unwrap()) {
+            } else if board.is_attacked_by_us(Square::try_from(board.them.king).unwrap()) {
                 Err(ParseBoardError::CapturableKing)
             } else {
                 Ok(board)
