@@ -443,8 +443,6 @@ impl FromStr for Board {
                 full_moves,
             };
 
-            board.update_move_restrictions();
-
             let is_impossible_en_passant_square = en_passant_capture_square.is_some_and(|square| {
                 let is_impossible_capture_square = (BitBoard::from(square)
                     & match current_color {
@@ -464,16 +462,18 @@ impl FromStr for Board {
             });
 
             if !board.us.king.is_a_single_one() || !board.them.king.is_a_single_one() {
-                Err(ParseBoardError::InvalidKingCount)
+                return Err(ParseBoardError::InvalidKingCount);
             } else if !(board.us.pawns & BitBoard::EDGE_RANKS).is_empty() {
-                Err(ParseBoardError::PawnsOnEdgeRanks)
+                return Err(ParseBoardError::PawnsOnEdgeRanks);
             } else if is_impossible_en_passant_square {
-                Err(ParseBoardError::InvalidEnPassantSquare(None))
+                return Err(ParseBoardError::InvalidEnPassantSquare(None));
             } else if board.is_attacked_by_us(Square::try_from(board.them.king).unwrap()) {
-                Err(ParseBoardError::CapturableKing)
-            } else {
-                Ok(board)
+                return Err(ParseBoardError::CapturableKing);
             }
+
+            board.update_move_restrictions();
+
+            Ok(board)
         }
     }
 }
