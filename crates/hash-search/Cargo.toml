@@ -1,0 +1,22 @@
+[package]
+name = "hash-search"
+authors = ["Yoav Grimland <miestrode@proton.me>"]
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hash-core.workspace = true
+hash-bootstrap.workspace = true
+hash-network.workspace = true
+arrayvec.workspace = true
+num-traits.workspace = true
+rand = { workspace = true, features = ["min_const_gen"] }
+burn.workspace = true
+burn-wgpu.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "hash-bootstrap"
+authors = ["Yoav Grimland <miestrode@proton.me>"]
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = { workspace = true, features = ["min_const_gen"] }
+standard-dist.workspace = true
+rustifact.workspace = true
+thiserror.workspace = true

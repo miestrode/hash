@@ -1,0 +1,22 @@
+[package]
+name = "hash-engine"
+description = "The Hash Chess Engine CLI"
+version = "0.1.0"
+authors = ["Yoav Grimland <miestrode@proton.me>"]
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
+clap = { workspace = true, features = ["derive"] }
+hash-bootstrap.workspace = true
+hash-core.workspace = true
+hash-search.workspace = true
+hash-network.workspace = true
+thiserror.workspace = true
+burn-wgpu.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

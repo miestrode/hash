@@ -1,3 +1,38 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.dependencies]
+hash-bootstrap = { path = "crates/hash-bootstrap" }
+hash-core = { path = "crates/hash-core" }
+hash-engine = { path = "crates/hash-engine" }
+hash-network = { path = "crates/hash-network" }
+hash-search = { path = "crates/hash-search" }
+hash-train = { path = "crates/hash-train" }
+rustifact = "0.10.1"
+burn = "0.11.1"
+burn-wgpu = "0.11.1"
+serde = "1.0.193"
+num-traits = "0.2.17"
+thiserror = "1.0.52"
+rand = "0.8.5"
+standard-dist = "1.0.0"
+arrayvec = "0.7.4"
+test-case = "3.3.1"
+ringbuffer = "0.15.0"
+clap = "4.4.12"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+
+[workspace.package]
+edition = "2021"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+enum_variant_names = "allow"
+
 [profile.release]
 codegen-units = 1
 lto = true
@@ -7,46 +42,3 @@ inherits = "release"
 
 [profile.bench]
 inherits = "release"
-
-[workspace]
-members = [
-    "hash-bootstrap",
-    "hash-core",
-    "hash-train",
-    "hash-search",
-    "hash-engine",
-    "hash-network",
-]
-
-[workspace.dependencies]
-hash-bootstrap = { path = "hash-bootstrap" }
-hash-core = { path = "hash-core" }
-hash-engine = { path = "hash-engine" }
-hash-network = { path = "hash-network" }
-hash-search = { path = "hash-search" }
-hash-train = { path = "hash-train" }
-rustifact = "0.10.1"
-burn = "0.11.1"
-burn-wgpu = "0.11.1"
-serde = "1.0.193"
-num-traits = "0.2.17"
-thiserror = "1.0.51"
-rand = "0.8.5"
-standard-dist = "1.0.0"
-arrayvec = "0.7.4"
-test-case = "3.3.1"
-ringbuffer = "0.15.0"
-clap = "4.4.11"
-tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
-
-[workspace.package]
-version = "0.1.0"
-authors = ["Yoav Grimland <miestrode@proton.me>"]
-edition = "2021"
-
-[workspace.lints.rust]
-unsafe_op_in_unsafe_fn = "deny"
-
-[workspace.lints.clippy]
-enum_variant_names = "allow"

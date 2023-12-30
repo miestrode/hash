@@ -1,0 +1,16 @@
+[package]
+name = "hash-network"
+version = "0.0.0"
+authors = ["Yoav Grimland <miestrode@proton.me>"]
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hash-bootstrap.workspace = true
+hash-core.workspace = true
+burn.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,20 @@
+[package]
+name = "hash-core"
+authors = ["Yoav Grimland <miestrode@proton.me>"]
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+hash-bootstrap.workspace = true
+rustifact.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+test-case.workspace = true
+
+[dependencies]
+hash-bootstrap.workspace = true
+rustifact.workspace = true
+arrayvec.workspace = true
+thiserror.workspace = true
