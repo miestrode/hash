@@ -9,12 +9,13 @@ hash-engine = { path = "crates/hash-engine" }
 hash-network = { path = "crates/hash-network" }
 hash-search = { path = "crates/hash-search" }
 hash-train = { path = "crates/hash-train" }
+
 rustifact = "0.10.1"
 burn = "0.11.1"
 burn-wgpu = "0.11.1"
 serde = "1.0.193"
 num-traits = "0.2.17"
-thiserror = "1.0.52"
+thiserror = "1.0.53"
 rand = "0.8.5"
 standard-dist = "1.0.0"
 arrayvec = "0.7.4"

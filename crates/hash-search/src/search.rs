@@ -24,7 +24,7 @@ pub fn start_search_thread(
     thread::spawn(move || loop {
         match command_receiver.try_recv() {
             Err(TryRecvError::Empty) => {
-                tracing::info!("expanding tree");
+                tracing::trace!("expanding tree");
                 tree.expand(&mut selector, &network);
             }
             Ok(command) => match command {

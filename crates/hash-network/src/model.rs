@@ -3,6 +3,7 @@ use burn::{
     module::Module,
     nn::{
         conv::{Conv2d, Conv2dConfig},
+        pool::{AvgPool2d, AvgPool2dConfig},
         BatchNorm, BatchNormConfig, Linear, LinearConfig, PaddingConfig2d, ReLU,
     },
     tensor::{activation, backend::Backend, Shape, Tensor},
@@ -38,50 +39,93 @@ fn calculate_board_tensor_dimension(move_history: usize) -> usize {
 }
 
 #[derive(Module, Debug)]
-struct ConvBlock<B: Backend> {
-    conv: Conv2d<B>,
+struct PreConvBlock<B: Backend> {
     batch_norm: BatchNorm<B, 2>,
     activation: ReLU,
+    conv: Conv2d<B>,
 }
 
-impl<B: Backend> ConvBlock<B> {
+impl<B: Backend> PreConvBlock<B> {
     fn forward(&self, input: Tensor<B, 4>) -> Tensor<B, 4> {
-        let x = self.conv.forward(input);
-        let x = self.batch_norm.forward(x);
+        let x = self.batch_norm.forward(input);
+        let x = self.activation.forward(x);
 
-        self.activation.forward(x)
+        self.conv.forward(x)
     }
 }
 
 #[derive(Config, Debug)]
-enum ConvBlockKind {
-    Head { move_history: usize },
-    Body { filters: usize },
-}
-
-#[derive(Config, Debug)]
-struct ConvBlockConfig {
-    conv_block_kind: ConvBlockKind,
+struct PreConvBlockConfig {
     kernel_length: usize,
     filters: usize,
 }
 
-impl ConvBlockConfig {
-    fn init<B: Backend>(&self) -> ConvBlock<B> {
-        let input_size = match self.conv_block_kind {
-            ConvBlockKind::Head { move_history } => calculate_board_tensor_dimension(move_history),
-            ConvBlockKind::Body { filters } => filters,
-        };
-
-        ConvBlock {
+impl PreConvBlockConfig {
+    fn init<B: Backend>(&self) -> PreConvBlock<B> {
+        PreConvBlock {
             conv: Conv2dConfig::new(
-                [input_size, self.filters],
+                [self.filters, self.filters],
                 [self.kernel_length, self.kernel_length],
             )
             .with_padding(PaddingConfig2d::Same)
             .init(),
             batch_norm: BatchNormConfig::new(self.filters).init(),
             activation: ReLU::default(),
+        }
+    }
+}
+
+#[derive(Module, Debug)]
+struct SeBlock<B: Backend> {
+    preconv_1: PreConvBlock<B>,
+    preconv_2: PreConvBlock<B>,
+    avg_pool: AvgPool2d,
+    fc_1: Linear<B>,
+    activation: ReLU,
+    fc_2: Linear<B>,
+}
+
+impl<B: Backend> SeBlock<B> {
+    fn forward(&self, input: Tensor<B, 4>) -> Tensor<B, 4> {
+        let residual = self.preconv_1.forward(input.clone());
+        let residual = self.preconv_2.forward(residual);
+
+        let scale = self.avg_pool.forward(residual.clone());
+        let final_shape = scale.shape();
+        let scale = scale.flatten::<2>(1, 3);
+        let scale = self.fc_1.forward(scale);
+        let scale = self.activation.forward(scale);
+        let scale = self.fc_2.forward(scale);
+        let scale = activation::sigmoid(scale);
+        let scale = scale.reshape(final_shape);
+
+        let scaled_residual = residual.mul(scale);
+
+        let result = input + scaled_residual;
+
+        self.activation.forward(result)
+    }
+}
+
+#[derive(Config, Debug)]
+struct SeBlockConfig {
+    kernel_length: usize,
+    filters: usize,
+    ratio: usize,
+}
+
+impl SeBlockConfig {
+    fn init<B: Backend>(&self) -> SeBlock<B> {
+        let fc_2_input_size = self.filters / self.ratio;
+        let preconv = PreConvBlockConfig::new(self.kernel_length, self.filters).init();
+
+        SeBlock {
+            activation: ReLU::default(),
+            preconv_1: preconv.clone(),
+            preconv_2: preconv,
+            avg_pool: AvgPool2dConfig::new([8, 8]).init(),
+            fc_1: LinearConfig::new(self.filters, fc_2_input_size).init(),
+            fc_2: LinearConfig::new(fc_2_input_size, self.filters).init(),
         }
     }
 }
@@ -94,7 +138,8 @@ pub struct BatchOutput<B: Backend> {
 #[derive(Module, Debug)]
 pub struct Model<B: Backend> {
     move_history: usize,
-    conv_blocks: Vec<ConvBlock<B>>,
+    conv_block: Conv2d<B>,
+    se_blocks: Vec<SeBlock<B>>,
     fc_1: Linear<B>,
     output: Linear<B>,
 }
@@ -105,10 +150,8 @@ impl<B: Backend> Model<B> {
     }
 
     pub fn forward(&self, input: Tensor<B, 4>) -> BatchOutput<B> {
-        let x = self
-            .conv_blocks
-            .iter()
-            .fold(input, |x, block| block.forward(x));
+        let x = self.conv_block.forward(input);
+        let x = self.se_blocks.iter().fold(x, |x, block| block.forward(x));
         let x = x.flatten(1, 3);
         let x = self.fc_1.forward(x);
         let x = self.output.forward(x);
@@ -128,45 +171,42 @@ impl<B: Backend> Model<B> {
 
 #[derive(Config, Debug)]
 pub struct ModelConfig {
-    #[config(default = 10000)]
+    #[config(default = 1)]
+    initial_kernel_stride: usize,
+    #[config(default = 3)]
+    initial_kernel_length: usize,
+    #[config(default = 1000)]
     hidden_layer_size: usize,
     #[config(default = 15)]
-    conv_blocks: usize,
-    #[config(default = 7)]
+    se_blocks: usize,
+    #[config(default = 8)]
     move_history: usize,
     #[config(default = 3)]
     kernel_length: usize,
-    #[config(default = 32)]
+    #[config(default = 256)]
     filters: usize,
+    #[config(default = 16)]
+    ratio: usize,
 }
 
 impl ModelConfig {
     pub fn init<B: Backend>(&self) -> Model<B> {
         Model {
             move_history: self.move_history,
-            conv_blocks: iter::once(
-                ConvBlockConfig::new(
-                    ConvBlockKind::Head {
-                        move_history: self.move_history,
-                    },
-                    self.kernel_length,
+            conv_block: Conv2dConfig::new(
+                [
+                    calculate_board_tensor_dimension(self.move_history),
                     self.filters,
-                )
-                .init(),
+                ],
+                [self.initial_kernel_length, self.initial_kernel_length],
             )
-            .chain(
-                iter::repeat(
-                    ConvBlockConfig::new(
-                        ConvBlockKind::Body {
-                            filters: self.filters,
-                        },
-                        self.kernel_length,
-                        self.filters,
-                    )
-                    .init(),
-                )
-                .take(self.conv_blocks - 1),
+            .with_stride([self.initial_kernel_stride, self.initial_kernel_stride])
+            .with_padding(PaddingConfig2d::Same)
+            .init(),
+            se_blocks: iter::repeat(
+                SeBlockConfig::new(self.kernel_length, self.filters, self.ratio).init(),
             )
+            .take(self.se_blocks)
             .collect(),
             fc_1: LinearConfig::new(self.filters * 8 * 8, self.hidden_layer_size).init(),
             output: LinearConfig::new(self.hidden_layer_size, OUTPUT_SIZE).init(),

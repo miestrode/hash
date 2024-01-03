@@ -241,7 +241,7 @@ impl<'a> Engine<'a> {
     }
 
     fn calculate_thinking_time(&self) -> Duration {
-        Duration::from_secs(5)
+        Duration::from_secs(10)
     }
 
     fn think(&mut self) -> Result<(), Box<dyn Error>> {
