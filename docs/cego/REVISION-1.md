@@ -64,7 +64,7 @@ After the mediator receives the confirmation, it should send the engine a first 
 <YOUR-TIME> <YOUR-INCREMENT> <OPPONENT-TIME> <OPPONENT-INCREMENT> <CURRENT-BOARD-FEN>\n
 ```
 
-where `<CURRENT-BOARD-FEN>` is the current position of the board, at the time of the engine's first move, in FEN notation. Note the increments which are a part of this message. `<YOUR-INCREMENT>` should be added to the time left for the engine once it makes its move. With this in mind, one can see that this protocol doesn't support timing methods, such as Bronstein.
+where `<CURRENT-BOARD-FEN>` is the current position of the board, at the time of the engine's first move, in FEN notation. Note the increments which are a part of this message. `<YOUR-INCREMENT>` should be added to the time left for the engine once it makes its move. With this in mind, one can see that this protocol doesn't support timing methods such as Bronstein.
 
 Once the engine makes it move, it should send a message of the form:
 
