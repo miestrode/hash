@@ -193,15 +193,19 @@ impl Display for OutgoingMessage {
     }
 }
 
+pub struct EngineParameters {
+    pub search_threads: usize,
+    pub exploration_rate: f32,
+}
+
 impl<'a> Engine<'a> {
     #[instrument(name = "init engine", skip_all)]
     pub fn new(
+        engine_parameters: EngineParameters,
         mut message_reader: MessageReader<'a>,
-        threads: usize,
     ) -> Result<Self, Box<dyn Error>> {
-        let selector = PuctSelector::new(4.0);
         let network = H0Config::new().init::<Wgpu>();
-        tracing::info!("initialized puct selector and network");
+        tracing::info!("initialized network");
 
         Self::send_message(OutgoingMessage::Ready);
 
@@ -218,8 +222,11 @@ impl<'a> Engine<'a> {
             "received initial message",
         );
 
-        let (command_sender, best_move_receiver) =
-            search::start_search_manager(Tree::new(board), selector, network, threads, threads);
+        let (command_sender, best_move_receiver) = search::start_search_thread(
+            Tree::new(board),
+            network,
+            engine_parameters.exploration_rate,
+        );
 
         tracing::info!("started search thread");
 

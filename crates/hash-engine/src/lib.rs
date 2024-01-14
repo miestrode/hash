@@ -5,7 +5,7 @@ use clap::{
     builder::{styling::AnsiColor, Styles},
     Parser, Subcommand,
 };
-use engine::{Engine, MessageReader};
+use engine::{Engine, EngineParameters, MessageReader};
 use tracing::Level;
 
 fn styles() -> Styles {
@@ -45,10 +45,17 @@ enum Command {
         #[arg(
             short = 't',
             long,
-            help = "The number of search threads to use while searching.",
+            help = "The number of search threads to use while searching. Default is 1.",
             default_value_t = 1
         )]
         search_threads: usize,
+        #[arg(
+            short = 'e',
+            long,
+            help = "The exploration rate to use for PUCT. Default is 4.0.",
+            default_value_t = 4.0
+        )]
+        exploration_rate: f32,
     },
 }
 
@@ -63,8 +70,15 @@ fn initialize_tracing(trace_file: PathBuf, tracing_level: Level) -> Result<(), B
     Ok(tracing::subscriber::set_global_default(subscriber)?)
 }
 
-fn run(search_threads: usize) -> Result<(), Box<dyn Error>> {
-    Engine::new(MessageReader::new(io::stdin().lock()), search_threads)?.run()
+fn run(search_threads: usize, exploration_rate: f32) -> Result<(), Box<dyn Error>> {
+    Engine::new(
+        MessageReader::new(io::stdin().lock()),
+        EngineParameters {
+            search_threads,
+            exploration_rate,
+        },
+    )?
+    .run()
 }
 
 pub fn cli() -> Result<(), Box<dyn Error>> {
@@ -75,6 +89,9 @@ pub fn cli() -> Result<(), Box<dyn Error>> {
     }
 
     match cli.command {
-        Command::Run { search_threads } => run(search_threads),
+        Command::Run {
+            search_threads,
+            exploration_rate,
+        } => run(search_threads, exploration_rate),
     }
 }

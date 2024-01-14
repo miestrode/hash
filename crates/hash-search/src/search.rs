@@ -4,7 +4,7 @@ use hash_core::{mg, repr::ChessMove};
 use hash_network::model::H0;
 
 use std::{
-    sync::mpsc::{Receiver, Sender, TryRecvError},
+    sync::mpsc::{self, Receiver, Sender, TryRecvError},
     thread,
 };
 
@@ -16,15 +16,17 @@ pub enum SearchCommand {
 pub fn start_search_thread<B: Backend>(
     mut tree: Tree,
     network: H0<B>,
-    command_receiver: Receiver<SearchCommand>,
-    best_move_sender: Sender<ChessMove>,
-) {
+    exploration_rate: f32,
+) -> (Sender<SearchCommand>, Receiver<ChessMove>) {
+    let (command_sender, command_receiver) = mpsc::channel();
+    let (best_move_sender, best_move_receiver) = mpsc::channel();
+
     thread::spawn(move || loop {
         match command_receiver.try_recv() {
             Err(TryRecvError::Empty) => {
                 tracing::trace!("expanding tree");
 
-                let (path, boards) = tree.select(4.0, network.move_history());
+                let (path, boards) = tree.select(exploration_rate, network.move_history());
                 let end_board = boards.last().unwrap();
                 let network_result = &network.process(vec![&boards])[0];
 
@@ -65,4 +67,6 @@ pub fn start_search_thread<B: Backend>(
             Err(TryRecvError::Disconnected) => return,
         }
     });
+
+    (command_sender, best_move_receiver)
 }

@@ -24,7 +24,6 @@ ringbuffer = "0.15.0"
 clap = "4.4.12"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
-crossbeam-channel = "0.5.10"
 boxcar = "0.2.4"
 
 [workspace.package]
