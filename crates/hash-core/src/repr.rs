@@ -170,13 +170,12 @@ impl TryFrom<char> for Piece {
     }
 }
 
-#[derive(Eq, Clone, Copy)]
+#[derive(Eq, Clone, Copy, Debug)]
 /// Represents a move in the game of Chess. To create a move one can use [`Board::interpret_move`].
 pub struct ChessMove {
     pub origin: Square,
     pub target: Square,
     pub promotion: Option<PieceKind>,
-    pub hash: Option<u64>, // Stores the hash of the board it was generated on, if it was generated
 }
 
 impl PartialEq for ChessMove {
@@ -237,7 +236,6 @@ impl FromStr for ChessMove {
                 origin,
                 target,
                 promotion,
-                hash: None,
             })
         }
     }

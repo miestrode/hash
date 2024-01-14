@@ -72,7 +72,6 @@ trait Gen {
                     origin: piece,
                     target,
                     promotion: None,
-                    hash: Some(board.hash),
                 })
         }));
 
@@ -89,7 +88,6 @@ trait Gen {
                     origin: piece,
                     target,
                     promotion: None,
-                    hash: Some(board.hash),
                 })
             }));
         }
@@ -179,7 +177,6 @@ impl Gen for Pawn {
                     origin: piece,
                     target,
                     promotion: None,
-                    hash: Some(board.hash),
                 })
         }));
 
@@ -196,7 +193,6 @@ impl Gen for Pawn {
                             origin: piece,
                             target,
                             promotion: Some(kind),
-                            hash: Some(board.hash),
                         })
                 })
         }));
@@ -215,7 +211,6 @@ impl Gen for Pawn {
                         origin: piece,
                         target,
                         promotion: None,
-                        hash: Some(board.hash),
                     })
             }));
 
@@ -236,7 +231,6 @@ impl Gen for Pawn {
                                 origin: piece,
                                 target,
                                 promotion: Some(kind),
-                                hash: Some(board.hash),
                             })
                     })
             }));
@@ -259,7 +253,6 @@ impl Gen for Pawn {
                             origin,
                             target: en_passant_capture_square,
                             promotion: None,
-                            hash: Some(board.hash),
                         });
                     }
                 }
@@ -315,7 +308,6 @@ impl Gen for Knight {
                     origin: piece,
                     target,
                     promotion: None,
-                    hash: Some(board.hash),
                 })
         }));
     }
@@ -397,7 +389,6 @@ impl Gen for King {
                 origin: king_square,
                 target,
                 promotion: None,
-                hash: Some(board.hash),
             }),
         );
 
@@ -418,7 +409,6 @@ impl Gen for King {
                         Color::Black => Square::G8,
                     },
                     promotion: None,
-                    hash: Some(board.hash),
                 });
             }
 
@@ -437,7 +427,6 @@ impl Gen for King {
                         Color::Black => Square::C8,
                     },
                     promotion: None,
-                    hash: Some(board.hash),
                 });
             }
         }

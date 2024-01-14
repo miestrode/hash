@@ -9,7 +9,7 @@ use burn::{
         Shape, Tensor,
     },
 };
-use hash_network::model::{BatchOutput, Model, ModelConfig};
+use hash_network::model::{BatchOutput, H0Config, H0};
 use rand::Rng;
 use ringbuffer::RingBuffer;
 
@@ -17,7 +17,7 @@ use crate::{play, TrainBuffer};
 
 pub fn add_games<B: Backend>(
     train_buffer: &mut TrainBuffer<B>,
-    model: &Model<B>,
+    model: &H0<B>,
     rng: &mut impl Rng,
     ply_cap: usize,
     games: usize,
@@ -83,7 +83,7 @@ pub fn run<B: AutodiffBackend>() {
         .with_weight_decay(Some(WeightDecayConfig::new(1e-5)))
         .with_gradient_clipping(Some(GradientClippingConfig::Norm(10.0)))
         .init();
-    let mut model = ModelConfig::new().init::<B>();
+    let mut model = H0Config::new().init::<B>();
     let mut train_buffer = TrainBuffer::new();
 
     for epoch in 1..epochs + 1 {

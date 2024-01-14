@@ -26,6 +26,7 @@ tracing-subscriber = { workspace = true, features = [
     "json",
     "env-filter",
 ] }
+crossbeam-channel.workspace = true
 
 [lints]
 workspace = true

@@ -7,17 +7,17 @@ use std::{
     iter,
     num::ParseIntError,
     str::FromStr,
-    sync::mpsc::{self, Receiver, Sender},
     thread,
     time::Duration,
 };
 
 use burn_wgpu::Wgpu;
+use crossbeam_channel::{Receiver, Sender};
 use hash_core::{
     board::{Board, ParseBoardError},
     repr::{ChessMove, ParseChessMoveError},
 };
-use hash_network::model::ModelConfig;
+use hash_network::model::H0Config;
 use hash_search::{
     puct::PuctSelector,
     search::{self, SearchCommand},
@@ -195,12 +195,12 @@ impl Display for OutgoingMessage {
 
 impl<'a> Engine<'a> {
     #[instrument(name = "init engine", skip_all)]
-    pub fn new(mut message_reader: MessageReader<'a>) -> Result<Self, Box<dyn Error>> {
-        let (command_sender, command_receiver) = mpsc::channel();
-        let (best_move_sender, best_move_receiver) = mpsc::channel();
-
+    pub fn new(
+        mut message_reader: MessageReader<'a>,
+        threads: usize,
+    ) -> Result<Self, Box<dyn Error>> {
         let selector = PuctSelector::new(4.0);
-        let network = ModelConfig::new().init::<Wgpu>();
+        let network = H0Config::new().init::<Wgpu>();
         tracing::info!("initialized puct selector and network");
 
         Self::send_message(OutgoingMessage::Ready);
@@ -218,13 +218,9 @@ impl<'a> Engine<'a> {
             "received initial message",
         );
 
-        search::start_search_thread(
-            Tree::new(board),
-            selector,
-            network,
-            command_receiver,
-            best_move_sender,
-        );
+        let (command_sender, best_move_receiver) =
+            search::start_search_manager(Tree::new(board), selector, network, threads, threads);
+
         tracing::info!("started search thread");
 
         Ok(Self {
@@ -247,10 +243,12 @@ impl<'a> Engine<'a> {
     fn think(&mut self) -> Result<(), Box<dyn Error>> {
         thread::sleep(self.calculate_thinking_time());
 
+        self.command_sender.send(SearchCommand::SendSearchResult)?;
+        let best_move = self.best_move_receiver.recv()?;
         self.command_sender
-            .send(SearchCommand::SendAndPlayBestMove)?;
+            .send(SearchCommand::PlayMove(best_move))?;
 
-        Self::send_message(OutgoingMessage::BestMove(self.best_move_receiver.recv()?));
+        Self::send_message(OutgoingMessage::BestMove(best_move));
 
         Ok(())
     }
@@ -267,7 +265,7 @@ impl<'a> Engine<'a> {
 
         self.times = times;
         self.command_sender
-            .send(SearchCommand::PlayedMove(played_move))?;
+            .send(SearchCommand::PlayMove(played_move))?;
 
         Ok(())
     }

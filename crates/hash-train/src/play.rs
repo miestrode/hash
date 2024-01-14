@@ -6,9 +6,8 @@ use hash_core::{
     board::Board,
     game::{Game, Outcome},
 };
-use hash_network::model::Model;
+use hash_network::model::{H0Result, MoveProbabilities, H0};
 use hash_search::{
-    network::{MoveProbabilities, NetworkResult},
     puct::PuctSelector,
     tree::{Selector, Tree},
 };
@@ -20,7 +19,7 @@ const EXPANSIONS: usize = 20;
 fn expand_tree(
     tree: &mut Tree,
     selector: &mut impl Selector,
-    model: &Model<impl Backend>,
+    model: &H0<impl Backend>,
     expansions: usize,
 ) {
     for _ in 0..expansions {
@@ -38,7 +37,7 @@ pub struct TrainInput<B: Backend> {
 // this could considerably improve performance here. Maybe using a global board array would also
 // improve performance
 pub fn gen_game<B: Backend>(
-    model: &Model<B>,
+    model: &H0<B>,
     ply_cap: usize,
     rng: &mut impl Rng,
 ) -> Vec<TrainInput<B>> {
@@ -100,7 +99,7 @@ pub fn gen_game<B: Backend>(
                     .chain(iter::repeat(None).take(model.move_history() - boards.len()))
                     .collect(),
             ),
-            expected_output: NetworkResult {
+            expected_output: H0Result {
                 // If the finshing color, in other words, the color that would play if the game
                 // wasn't finished, actually won, it would mean it would have the ability to
                 // capture the opponent's king, and thus this color always loses.

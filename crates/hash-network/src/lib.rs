@@ -1,4 +1,5 @@
-// TODO: Refactor this whole module, the code here is quite ugly.
+#![feature(array_chunks)]
+
 use burn::tensor::{backend::Backend, Shape, Tensor};
 use hash_bootstrap::{BitBoard, Color, Square};
 use hash_core::{board::Board, repr::Player};
@@ -32,42 +33,50 @@ fn boolean_to_tensor<B: Backend>(boolean: bool) -> Tensor<B, 2> {
     }
 }
 
-pub fn board_to_tensor<B: Backend>(board: Option<&Board>) -> Tensor<B, 3> {
-    if let Some(board) = board {
-        Tensor::cat(
-            vec![
-                player_to_tensor(&board.us),
-                player_to_tensor(&board.them),
-                bitboard_to_tensor(BitBoard::from(board.en_passant_capture_square)).unsqueeze(),
-                boolean_to_tensor(board.us.castling_rights.can_castle_king_side()).unsqueeze(),
-                boolean_to_tensor(board.us.castling_rights.can_castle_queen_side()).unsqueeze(),
-                boolean_to_tensor(board.them.castling_rights.can_castle_king_side()).unsqueeze(),
-                boolean_to_tensor(board.them.castling_rights.can_castle_queen_side()).unsqueeze(),
-                match board.playing_color {
-                    Color::White => Tensor::ones(Shape::new([8, 8])),
-                    Color::Black => Tensor::ones(Shape::new([8, 8])).neg(),
-                }
-                .unsqueeze(),
-                Tensor::from_floats([board.min_ply_clock as f32; 64])
-                    .reshape(Shape::new([1, 8, 8])),
-                boolean_to_tensor(true).unsqueeze(), // This is for the existence layer
-            ],
-            0,
-        )
-    } else {
-        Tensor::zeros(Shape::new([model::SINGLE_BOARD_DIMENSION, 8, 8]))
-    }
-}
-
-// TODO: It might be the best to just fill the rest with zeroes on the tensor level, instead of
-// requiring one to pass a bunch of zeros
-pub fn boards_to_tensor<B: Backend>(boards: Vec<Option<&Board>>) -> Tensor<B, 3> {
+fn board_to_tensor<B: Backend>(board: &Board) -> Tensor<B, 3> {
     Tensor::cat(
-        boards
-            .iter()
-            .copied()
-            .map(|board| board_to_tensor(board))
-            .collect(),
+        vec![player_to_tensor(&board.us), player_to_tensor(&board.them)],
         0,
     )
+}
+
+fn final_board_to_tensor<B: Backend>(board: &Board) -> Tensor<B, 3> {
+    Tensor::cat(
+        vec![
+            player_to_tensor(&board.us),
+            player_to_tensor(&board.them),
+            boolean_to_tensor(board.us.castling_rights.can_castle_king_side()).unsqueeze(),
+            boolean_to_tensor(board.us.castling_rights.can_castle_queen_side()).unsqueeze(),
+            boolean_to_tensor(board.them.castling_rights.can_castle_king_side()).unsqueeze(),
+            boolean_to_tensor(board.them.castling_rights.can_castle_queen_side()).unsqueeze(),
+            match board.playing_color {
+                Color::White => Tensor::ones(Shape::new([8, 8])),
+                Color::Black => Tensor::ones(Shape::new([8, 8])).neg(),
+            }
+            .unsqueeze(),
+        ],
+        0,
+    )
+}
+
+pub fn boards_to_tensor<B: Backend>(boards: &[Board], move_history: usize) -> Tensor<B, 3> {
+    let final_board_tensor = final_board_to_tensor(boards.last().unwrap());
+
+    let mut board_tensors = boards[..boards.len()]
+        .iter()
+        .map(board_to_tensor)
+        .collect::<Vec<_>>();
+
+    board_tensors.push(final_board_tensor);
+    board_tensors.insert(
+        0,
+        Tensor::zeros(Shape::new([
+            model::calculate_board_tensor_dimension(move_history)
+                - model::calculate_board_tensor_dimension(boards.len()),
+            8,
+            8,
+        ])),
+    );
+
+    Tensor::cat(board_tensors, 0)
 }

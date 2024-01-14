@@ -1,8 +1,7 @@
-use crate::{
-    network::Network,
-    tree::{Selector, Tree},
-};
-use hash_core::repr::ChessMove;
+use crate::tree::Tree;
+use burn::tensor::backend::Backend;
+use hash_core::{mg, repr::ChessMove};
+use hash_network::model::H0;
 
 use std::{
     sync::mpsc::{Receiver, Sender, TryRecvError},
@@ -14,10 +13,9 @@ pub enum SearchCommand {
     PlayedMove(ChessMove),
 }
 
-pub fn start_search_thread(
+pub fn start_search_thread<B: Backend>(
     mut tree: Tree,
-    mut selector: impl Selector + Send + 'static,
-    network: impl Network + Send + 'static,
+    network: H0<B>,
     command_receiver: Receiver<SearchCommand>,
     best_move_sender: Sender<ChessMove>,
 ) {
@@ -25,7 +23,23 @@ pub fn start_search_thread(
         match command_receiver.try_recv() {
             Err(TryRecvError::Empty) => {
                 tracing::trace!("expanding tree");
-                tree.expand(&mut selector, &network);
+
+                let (path, boards) = tree.select(4.0, network.move_history());
+                let end_board = boards.last().unwrap();
+                let network_result = &network.process(vec![&boards])[0];
+
+                tree.expand(
+                    *path.last().unwrap(),
+                    &mg::gen_moves(end_board)
+                        .into_iter()
+                        .map(|chess_move| {
+                            (network_result.move_probabilities[chess_move], chess_move)
+                        })
+                        .collect::<Vec<_>>(),
+                );
+
+                // SAFETY: The path was obtained from `Tree::select`
+                unsafe { tree.backpropagate(network_result.value, &path) };
             }
             Ok(command) => match command {
                 SearchCommand::SendAndPlayBestMove => {
@@ -38,13 +52,13 @@ pub fn start_search_thread(
                     }
 
                     tracing::info!(%best_move, "advancing tree");
-                    tree = tree.advance(best_move).unwrap();
+
+                    tree.try_advance(best_move).unwrap();
                 }
                 SearchCommand::PlayedMove(chess_move) => {
                     tracing::info!(%chess_move, "received opponent move");
 
-                    tree = tree
-                        .advance(chess_move)
+                    tree.try_advance(chess_move)
                         .expect("opponent move is illegal or invalid");
                 }
             },

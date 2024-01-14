@@ -289,7 +289,7 @@ impl Board {
     }
 
     pub fn make_move(&mut self, chess_move: ChessMove) -> Result<(), MakeMoveError> {
-        if chess_move.hash == Some(self.hash) || mg::gen_moves(self).contains(&chess_move) {
+        if mg::gen_moves(self).contains(&chess_move) {
             // SAFETY: Move was generated for this board by the legal move generator
             unsafe {
                 self.make_move_unchecked(chess_move);

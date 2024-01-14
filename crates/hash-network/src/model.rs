@@ -8,21 +8,29 @@ use burn::{
     },
     tensor::{activation, backend::Backend, Shape, Tensor},
 };
-use std::iter;
+use hash_bootstrap::Square;
+use hash_core::{
+    board::Board,
+    repr::{ChessMove, PieceKind},
+};
+use std::{
+    iter,
+    ops::{Index, IndexMut},
+};
+
+use crate::boards_to_tensor;
 
 // TODO: Consider placing some of the information here in the input instead of in each historical board state.
 // The 3rd dimension value of the shape of a board tensor.
 #[rustfmt::skip]
-pub const SINGLE_BOARD_DIMENSION: usize =
+pub const FINAL_BOARD_DIMENSION: usize =
     6 // 6 piece kinds for white 
         + 6 // 6 piece kinds for black 
         + 1 // 1 layer for the en passant square
         + 2 // 2 ways to castle (king-side, queen-side) for white
         + 2 // 2 ways to castle (king-side, queen-side) for black
-        + 1 // 1 layer to denote who is playing. 1 = white, -1 = black.
-        + 1 // 1 layer for the half-move clock, as per the 50 move rule.
-        + 1; // 1 layer to denote if this board is even existent. Naturally a history of N-moves
-             // cannot be created when a game hasn't gone through N positions.
+        + 1; // 1 layer to denote who is playing. 1 = white, -1 = black.
+pub const SINGLE_BOARD_DIMENSION: usize = 6 + 6;
 
 // The output size is simply the length of the vector output by the model. It encodes all Chess
 // moves and a position value node. Note that it does overshoot the number of possible Chess moves
@@ -34,8 +42,8 @@ const OUTPUT_SIZE: usize =
         + 8 * 8 * 4  // All of the possible promotions for the eighth rank
         + 8 * 8 * 4; // All of the possible promotions for the first rank
 
-fn calculate_board_tensor_dimension(move_history: usize) -> usize {
-    SINGLE_BOARD_DIMENSION * move_history
+pub(crate) fn calculate_board_tensor_dimension(move_history: usize) -> usize {
+    SINGLE_BOARD_DIMENSION * (move_history - 1) + FINAL_BOARD_DIMENSION
 }
 
 #[derive(Module, Debug)]
@@ -130,13 +138,97 @@ impl SeBlockConfig {
     }
 }
 
+pub struct MoveProbabilities {
+    probabilities: [f32; MoveProbabilities::ARRAY_LENGTH],
+}
+
+impl MoveProbabilities {
+    const REGULAR_MOVE_SECTION_LENGTH: usize = 64 * 64;
+
+    const SINGLE_PIECE_PROMOTION_SECTION_LENGTH: usize = 8 * 8;
+    const SINGLE_RANK_PROMOTION_SECTION_LENGTH: usize =
+        Self::SINGLE_PIECE_PROMOTION_SECTION_LENGTH * 4;
+
+    const ARRAY_LENGTH: usize =
+        Self::REGULAR_MOVE_SECTION_LENGTH + 2 * Self::SINGLE_RANK_PROMOTION_SECTION_LENGTH;
+
+    pub fn new_from_raw(probabilities: [f32; MoveProbabilities::ARRAY_LENGTH]) -> Self {
+        Self { probabilities }
+    }
+
+    pub fn new(probability_iter: impl Iterator<Item = (f32, ChessMove)>) -> Self {
+        let mut move_probabilities = Self {
+            probabilities: [0.0; Self::ARRAY_LENGTH],
+        };
+
+        for (probability, chess_move) in probability_iter {
+            move_probabilities[chess_move] = probability;
+        }
+
+        move_probabilities
+    }
+
+    fn move_to_index(chess_move: ChessMove) -> usize {
+        if let Some(piece_kind) = chess_move.promotion {
+            let promotion_number: usize = match piece_kind {
+                PieceKind::Queen => 0,
+                PieceKind::Rook => 1,
+                PieceKind::Bishop => 2,
+                PieceKind::Knight => 3,
+                _ => unreachable!(),
+            };
+
+            let is_eighth_rank_promotion = chess_move.target.rank() == Square::RANK_8;
+
+            Self::REGULAR_MOVE_SECTION_LENGTH
+                + chess_move.origin.file() as usize
+                + 8 * chess_move.target.file() as usize
+                + Self::SINGLE_PIECE_PROMOTION_SECTION_LENGTH * promotion_number
+                + Self::SINGLE_RANK_PROMOTION_SECTION_LENGTH * (is_eighth_rank_promotion as usize)
+        } else {
+            chess_move.origin.as_index() + chess_move.target.as_index() * 64
+        }
+    }
+}
+
+impl Index<ChessMove> for MoveProbabilities {
+    type Output = f32;
+
+    fn index(&self, index: ChessMove) -> &Self::Output {
+        &self.probabilities[Self::move_to_index(index)]
+    }
+}
+
+impl IndexMut<ChessMove> for MoveProbabilities {
+    fn index_mut(&mut self, index: ChessMove) -> &mut Self::Output {
+        &mut self.probabilities[Self::move_to_index(index)]
+    }
+}
+
+pub struct H0Result {
+    pub value: f32,
+    pub move_probabilities: MoveProbabilities,
+}
+
+impl<B: Backend> From<H0Result> for Tensor<B, 1> {
+    fn from(value: H0Result) -> Self {
+        Tensor::cat(
+            vec![
+                Tensor::from_floats(value.move_probabilities.probabilities),
+                Tensor::from_floats([value.value]),
+            ],
+            0,
+        )
+    }
+}
+
 pub struct BatchOutput<B: Backend> {
     pub values: Tensor<B, 1>,
     pub probabilities: Tensor<B, 2>,
 }
 
 #[derive(Module, Debug)]
-pub struct Model<B: Backend> {
+pub struct H0<B: Backend> {
     move_history: usize,
     conv_block: Conv2d<B>,
     se_blocks: Vec<SeBlock<B>>,
@@ -144,7 +236,7 @@ pub struct Model<B: Backend> {
     output: Linear<B>,
 }
 
-impl<B: Backend> Model<B> {
+impl<B: Backend> H0<B> {
     pub fn move_history(&self) -> usize {
         self.move_history
     }
@@ -167,31 +259,61 @@ impl<B: Backend> Model<B> {
             probabilities,
         }
     }
+
+    pub fn process(&self, input: Vec<&[Board]>) -> Vec<H0Result> {
+        let batch_output = self.forward(Tensor::stack(
+            input
+                .iter()
+                .map(|boards| boards_to_tensor(boards, self.move_history()))
+                .collect(),
+            0,
+        ));
+
+        let values: Vec<f32> = batch_output.values.into_data().convert().value;
+        // TODO: Check that this code does what we want
+        let probabilities = batch_output
+            .probabilities
+            .into_data()
+            .convert::<f32>()
+            .value
+            .array_chunks::<{ MoveProbabilities::ARRAY_LENGTH }>()
+            .map(|&probabilities| MoveProbabilities { probabilities })
+            .collect::<Vec<_>>();
+
+        values
+            .into_iter()
+            .zip(probabilities)
+            .map(|(value, move_probabilities)| H0Result {
+                value,
+                move_probabilities,
+            })
+            .collect()
+    }
 }
 
 #[derive(Config, Debug)]
-pub struct ModelConfig {
+pub struct H0Config {
     #[config(default = 1)]
     initial_kernel_stride: usize,
     #[config(default = 3)]
     initial_kernel_length: usize,
     #[config(default = 1000)]
     hidden_layer_size: usize,
-    #[config(default = 15)]
+    #[config(default = 10)]
     se_blocks: usize,
     #[config(default = 8)]
     move_history: usize,
     #[config(default = 3)]
     kernel_length: usize,
-    #[config(default = 256)]
+    #[config(default = 128)]
     filters: usize,
     #[config(default = 16)]
     ratio: usize,
 }
 
-impl ModelConfig {
-    pub fn init<B: Backend>(&self) -> Model<B> {
-        Model {
+impl H0Config {
+    pub fn init<B: Backend>(&self) -> H0<B> {
+        H0 {
             move_history: self.move_history,
             conv_block: Conv2dConfig::new(
                 [
