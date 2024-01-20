@@ -1,6 +1,6 @@
 use crate::tree::Tree;
 use burn::tensor::backend::Backend;
-use hash_core::{mg, repr::ChessMove};
+use hash_core::repr::ChessMove;
 use hash_network::model::H0;
 
 use std::{
@@ -24,24 +24,9 @@ pub fn start_search_thread<B: Backend>(
     thread::spawn(move || loop {
         match command_receiver.try_recv() {
             Err(TryRecvError::Empty) => {
-                tracing::trace!("expanding tree");
+                tracing::trace!("growing tree");
 
-                let (path, boards) = tree.select(exploration_rate, network.move_history());
-                let end_board = boards.last().unwrap();
-                let network_result = &network.process(vec![&boards])[0];
-
-                tree.expand(
-                    *path.last().unwrap(),
-                    &mg::gen_moves(end_board)
-                        .into_iter()
-                        .map(|chess_move| {
-                            (network_result.move_probabilities[chess_move], chess_move)
-                        })
-                        .collect::<Vec<_>>(),
-                );
-
-                // SAFETY: The path was obtained from `Tree::select`
-                unsafe { tree.backpropagate(network_result.value, &path) };
+                tree.grow(&network, exploration_rate);
             }
             Ok(command) => match command {
                 SearchCommand::SendAndPlayBestMove => {
@@ -53,7 +38,7 @@ pub fn start_search_thread<B: Backend>(
                         return;
                     }
 
-                    tracing::info!(%best_move, "advancing tree");
+                    tracing::info!(%best_move, "growing tree");
 
                     tree.try_advance(best_move).unwrap();
                 }

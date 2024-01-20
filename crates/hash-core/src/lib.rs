@@ -1,5 +1,3 @@
-#![feature(test)]
-
 pub mod board;
 pub mod game;
 mod index;
@@ -8,20 +6,10 @@ pub mod repr;
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
-
     use std::str::FromStr;
 
     use crate::{board::Board, repr::ChessMove};
-    use test::Bencher;
     use test_case::test_case;
-
-    #[bench]
-    fn bench_perft_starting_position_depth_5(b: &mut Bencher) {
-        let board = Board::starting_position();
-
-        b.iter(|| board.perft(5));
-    }
 
     #[test_case("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; "starting position")]
     #[test_case("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"; "kiwipete")]

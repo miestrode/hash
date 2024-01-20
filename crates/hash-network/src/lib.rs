@@ -1,5 +1,3 @@
-#![feature(array_chunks)]
-
 use burn::tensor::{backend::Backend, Shape, Tensor};
 use hash_bootstrap::{BitBoard, Color, Square};
 use hash_core::{board::Board, repr::Player};

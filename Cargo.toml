@@ -9,30 +9,34 @@ hash-engine = { path = "crates/hash-engine" }
 hash-network = { path = "crates/hash-network" }
 hash-search = { path = "crates/hash-search" }
 hash-train = { path = "crates/hash-train" }
-
+hash-server = { path = "crates/hash-server" }
+hash-client = { path = "crates/hash-client" }
 rustifact = "0.10.1"
 burn = "0.11.1"
 burn-wgpu = "0.11.1"
-serde = "1.0.193"
-num-traits = "0.2.17"
-thiserror = "1.0.53"
+serde = "1.0.195"
+thiserror = "1.0.56"
 rand = "0.8.5"
 standard-dist = "1.0.0"
 arrayvec = "0.7.4"
 test-case = "3.3.1"
 ringbuffer = "0.15.0"
-clap = "4.4.12"
+clap = "4.4.18"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 boxcar = "0.2.4"
+ractor = "0.9.3"
+ractor_cluster = "0.9.3"
 
 [workspace.package]
 edition = "2021"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
+unused_crate_dependencies = "warn"
 
 [workspace.lints.clippy]
+missing_safety_doc = "allow"
 enum_variant_names = "allow"
 
 [profile.release]

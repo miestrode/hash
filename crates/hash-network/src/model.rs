@@ -276,8 +276,10 @@ impl<B: Backend> H0<B> {
             .into_data()
             .convert::<f32>()
             .value
-            .array_chunks::<{ MoveProbabilities::ARRAY_LENGTH }>()
-            .map(|&probabilities| MoveProbabilities { probabilities })
+            .chunks(MoveProbabilities::ARRAY_LENGTH)
+            .map(|probabilities| MoveProbabilities {
+                probabilities: probabilities.try_into().unwrap(),
+            })
             .collect::<Vec<_>>();
 
         values

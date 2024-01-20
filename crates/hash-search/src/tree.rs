@@ -3,7 +3,9 @@ use std::{
     sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use hash_core::{board::Board, repr::ChessMove};
+use burn::tensor::backend::Backend;
+use hash_core::{board::Board, mg, repr::ChessMove};
+use hash_network::model::H0;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::puct;
@@ -82,15 +84,16 @@ impl Tree {
     }
 
     pub fn try_advance(&mut self, chess_move: ChessMove) -> Result<(), AdvanceTreeError> {
-        let mut children = self
+        let next_root_index = self
             .get_children_metadata(&self.root())
-            .ok_or(AdvanceTreeError::NotExpandedError)?;
-
-        self.root_index = children
+            .ok_or(AdvanceTreeError::NotExpandedError)?
             .find(|(_, child_metadata)| child_metadata.chess_move == chess_move)
             .ok_or(AdvanceTreeError::IllegalMove)?
             .0;
-        self.root_board.make_move(chess_move);
+
+        self.root_index = next_root_index;
+
+        self.root_board.make_move(chess_move).unwrap();
 
         Ok(())
     }
@@ -195,5 +198,22 @@ impl Tree {
                 metadata.visits += 1;
             }
         }
+    }
+
+    pub fn grow<B: Backend>(&self, network: &H0<B>, exploration_rate: f32) {
+        let (path, boards) = self.select(exploration_rate, network.move_history());
+        let end_board = boards.last().unwrap();
+        let network_result = &network.process(vec![&boards[..]])[0];
+
+        self.expand(
+            *path.last().unwrap(),
+            &mg::gen_moves(end_board)
+                .into_iter()
+                .map(|chess_move| (network_result.move_probabilities[chess_move], chess_move))
+                .collect::<Vec<_>>(),
+        );
+
+        // SAFETY: The path was obtained from `Tree::select`
+        unsafe { self.backpropagate(network_result.value, &path) };
     }
 }

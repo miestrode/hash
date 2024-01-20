@@ -45,14 +45,14 @@ enum Command {
         #[arg(
             short = 't',
             long,
-            help = "The number of search threads to use while searching. Default is 1.",
+            help = "The number of search threads to use while searching.",
             default_value_t = 1
         )]
         search_threads: usize,
         #[arg(
             short = 'e',
             long,
-            help = "The exploration rate to use for PUCT. Default is 4.0.",
+            help = "The exploration rate to use for PUCT.",
             default_value_t = 4.0
         )]
         exploration_rate: f32,
@@ -72,11 +72,11 @@ fn initialize_tracing(trace_file: PathBuf, tracing_level: Level) -> Result<(), B
 
 fn run(search_threads: usize, exploration_rate: f32) -> Result<(), Box<dyn Error>> {
     Engine::new(
-        MessageReader::new(io::stdin().lock()),
         EngineParameters {
             search_threads,
             exploration_rate,
         },
+        MessageReader::new(io::stdin().lock()),
     )?
     .run()
 }

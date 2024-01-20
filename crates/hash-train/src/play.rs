@@ -33,6 +33,10 @@ pub struct TrainInput<B: Backend> {
     pub expected_output: Tensor<B, 1>,
 }
 
+fn make_move(model: &H0<B>, game_boards: &Vec<Board>, rng: &mut impl Rng) {
+    let x = 2;
+}
+
 // TODO: Optimize and refactor this code and consider using const-generics for the move history as
 // this could considerably improve performance here. Maybe using a global board array would also
 // improve performance
@@ -41,17 +45,17 @@ pub fn gen_game<B: Backend>(
     ply_cap: usize,
     rng: &mut impl Rng,
 ) -> Vec<TrainInput<B>> {
-    let mut puct_selector = PuctSelector::new(4.0);
     let mut tree = Tree::new(Board::starting_position());
 
     let mut positions = Vec::with_capacity(ply_cap);
     let mut boards = AllocRingBuffer::new(model.move_history());
-    let mut game = Game::starting_position();
 
     let outcome = loop {
         boards.push(*game.board());
 
-        expand_tree(&mut tree, &mut puct_selector, model, EXPANSIONS);
+        for _ in 0..expansions {
+            tree.expand(selector, model);
+        }
 
         let tree_visits = tree.visits() as f32;
         let children = tree.children().unwrap();

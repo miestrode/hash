@@ -7,19 +7,18 @@ use std::{
     iter,
     num::ParseIntError,
     str::FromStr,
+    sync::mpsc::{Receiver, Sender},
     thread,
     time::Duration,
 };
 
 use burn_wgpu::Wgpu;
-use crossbeam_channel::{Receiver, Sender};
 use hash_core::{
     board::{Board, ParseBoardError},
     repr::{ChessMove, ParseChessMoveError},
 };
 use hash_network::model::H0Config;
 use hash_search::{
-    puct::PuctSelector,
     search::{self, SearchCommand},
     tree::Tree,
 };
@@ -250,10 +249,9 @@ impl<'a> Engine<'a> {
     fn think(&mut self) -> Result<(), Box<dyn Error>> {
         thread::sleep(self.calculate_thinking_time());
 
-        self.command_sender.send(SearchCommand::SendSearchResult)?;
-        let best_move = self.best_move_receiver.recv()?;
         self.command_sender
-            .send(SearchCommand::PlayMove(best_move))?;
+            .send(SearchCommand::SendAndPlayBestMove)?;
+        let best_move = self.best_move_receiver.recv()?;
 
         Self::send_message(OutgoingMessage::BestMove(best_move));
 
@@ -272,7 +270,7 @@ impl<'a> Engine<'a> {
 
         self.times = times;
         self.command_sender
-            .send(SearchCommand::PlayMove(played_move))?;
+            .send(SearchCommand::PlayedMove(played_move))?;
 
         Ok(())
     }

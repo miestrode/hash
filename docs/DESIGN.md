@@ -22,9 +22,18 @@ Contains the model definition and supporting code for the Hash neural network (c
 
 ### `hash-train`
 
-Is a binary that uses `hash-network` in order to train a network using its model, and then save it, so it can be used by the engine.
+Contains core definitions for training the neural network (currently H0).
+
+### `hash-server`
+
+Is a binary for running an instance of the Hash Training and Evaluation Server (HTES), which acts as a distributed job pool for engine SPRT testing, and for training the engine's neural networks, by using computers running `hash-client`.
+
+### `hash-client`
+
+Is a binary for running a client which can perform jobs for an HTES, upon the receival of a request. This means either training jobs, or 
 
 ### `hash-search`
+
 Contains the primary searching logic for the engine, by providing an advanced parallel searching algorithm based on AlphaZero-style MCTS, using `hash-network`.
 
 ### `hash-engine`
