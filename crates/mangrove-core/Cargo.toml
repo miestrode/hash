@@ -1,0 +1,20 @@
+[package]
+name = "mangrove-core"
+version = "0.0.0"
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+mangrove-bootstrap.workspace = true
+rustifact.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+test-case.workspace = true
+
+[dependencies]
+mangrove-bootstrap.workspace = true
+rustifact.workspace = true
+arrayvec.workspace = true
+thiserror.workspace = true

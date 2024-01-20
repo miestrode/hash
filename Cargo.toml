@@ -3,14 +3,16 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
-hash-bootstrap = { path = "crates/hash-bootstrap" }
-hash-core = { path = "crates/hash-core" }
-hash-engine = { path = "crates/hash-engine" }
-hash-network = { path = "crates/hash-network" }
-hash-search = { path = "crates/hash-search" }
-hash-train = { path = "crates/hash-train" }
-hash-server = { path = "crates/hash-server" }
-hash-client = { path = "crates/hash-client" }
+mangrove-bootstrap = { path = "crates/mangrove-bootstrap" }
+mangrove-core = { path = "crates/mangrove-core" }
+mangrove-engine = { path = "crates/mangrove-engine" }
+mangrove-pisa = { path = "crates/mangrove-pisa" }
+mangrove-search = { path = "crates/mangrove-search" }
+mangrove-train = { path = "crates/mangrove-train" }
+
+swamp-server = { path = "crates/swamp-server" }
+swamp-client = { path = "crates/swamp-client" }
+
 rustifact = "0.10.1"
 burn = "0.11.1"
 burn-wgpu = "0.11.1"

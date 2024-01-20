@@ -1,0 +1,17 @@
+[package]
+name = "mangrove-train"
+version = "0.0.0"
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+mangrove-core.workspace = true
+mangrove-search.workspace = true
+mangrove-pisa.workspace = true
+burn = { workspace = true, features = ["autodiff"] }
+ringbuffer.workspace = true
+rand.workspace = true
+
+[lints]
+workspace = true
