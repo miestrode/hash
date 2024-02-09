@@ -18,4 +18,4 @@ As we feel Mangrove is a sufficiently large project, documentation explaining th
 
 ## Contributing
 
-Mangrove currently isn't accept contributions which significantly alter the source code, and so does not have guidelines for doing so. This is because things are currently far too underdeveloped. In the future, a `CONTRIBUTING.md` file will be made.
+Mangrove currently isn't accepting contributions which significantly alter the source code, and so does not have guidelines for doing so. This is because things are currently far too underdeveloped. In the future, a `CONTRIBUTING.md` file will be made.
