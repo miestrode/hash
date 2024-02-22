@@ -8,7 +8,7 @@ This document details revision 1 of CEGO. Whenever any change will be made to th
 
 As a protocol, CEGO facilitates communication between two entities: an engine, and a mediator. A mediator here is a general term for any program which is operating a Chess game. This communication is done in plain-text, encoded in ASCII, by passing messages using the standard streams. Specifically, the mediator sends text to the standard input of the engine, and the engine sends text to its standard output. Every message must contain only a single newline, at its end. On windows, this means `\r\n`, and on other platforms, `\n`.
 
-Due to many reasons, communication can sometimes fail, resulting in malformed updates. Therefore, it is important to understand CEGO implements no mechanisms for fault tolerance. In other words, it fails *hard* and *fast*. In addition, text in the protocol is case-sensitive, and arbitrary whitespace separators, like those seen in UCI cannot be used.
+Due to many reasons, messages received can be malformed. Therefore, it is important to understand that CEGO implements no mechanisms for fault tolerance. When a message is malformed, engines are instructed to simply terminate, and mediators are instructed to terminate the engines. In addition, text in the protocol is case-sensitive, and arbitrary whitespace separators, like those seen in UCI cannot be used.
 
 The specification here is written while only referring to the communications between the mediator and a single engine, although in actual use, the mediator would have to communicate with two Chess engines. Luckily, the protocol is entirely symmetric, making this trivial. Whenever one engine "sends a move", the mediator sends a message to the other Chess engine, using the protocol, so it can make a move. Once it does, that move is sent by the mediator to the original Chess engine, and this process repeats.
 
@@ -48,13 +48,13 @@ For en passants, the origin and target squares used are those of the pawn perfor
 
 ### Initialization
 
-The first stage of CEGO is initialization, and it ensures the engine are ready for playing, as some engines have long initialization times, which can be caused by, for example, loading a neural network, downloading a tablebase, etc. Therefore, once communication begins, engines should send the message:
+The first stage of CEGO is initialization, and it ensures the engine are ready for playing, as some engines have long initialization times. This can be caused by, for example, loading a neural network, downloading a tablebase, etc. Therefore, once communication begins, engines should send the message:
 
 ```
 ready\n
 ```
 
-as soon as it is ready to play. Note that like all messages, this one should be terminated by a newline, as seen above.
+as soon as they are ready to play. Note that like all messages, this one should be terminated by a newline, as seen above.
 
 ### First move
 
