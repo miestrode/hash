@@ -16,6 +16,10 @@ Mangrove doesn't support UCI, and instead uses its bespoke protocol, CEGO (Chess
 
 As we feel Mangrove is a sufficiently large project, documentation explaining things such as its current network structure and things of the like can be seen in [here](docs/). Note that documentation is currently largely incomplete.
 
+## License
+
+Mangrove is licensed under the [GNU General Public License, v3.0](LICENSE).
+
 ## Contributing
 
 Mangrove currently isn't accepting contributions which significantly alter the source code, and so does not have guidelines for doing so. This is because things are currently far too underdeveloped. In the future, a `CONTRIBUTING.md` file will be made.
