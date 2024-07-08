@@ -112,7 +112,7 @@ Each message is preceded by text of the form `<SENDER> -> <RECEIVER>: `, where t
 ```
 # Both engines send that they have finished initialization, at different time frames
 2 -> m: ready\n
-1 -> m ready\n
+1 -> m: ready\n
 # First move. Both engine start with 30 seconds, with an increment of 1 second throughout.
 m -> 1: 30000000000 1000000000 30000000000 1000000000 rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n
 # Engine 1 thinks for 5 seconds.
